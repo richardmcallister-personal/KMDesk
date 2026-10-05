@@ -10,16 +10,20 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
 
-      # Bump CACHE in public/service-worker.js before each deploy, or phones
-      # keep serving the shell they already have.
+      # Bump CACHE in public/service-worker.js whenever public/ changes, or
+      # phones keep serving the shell they already have.
       - name: Fail if the service worker cache was not bumped
         run: |
           V=$(grep -o 'km-desk-v[0-9]*' public/service-worker.js | head -1)
           echo "service worker cache: $V"
-          git fetch --depth=2 origin ${{ github.ref_name }} || true
           if git show HEAD~1:public/service-worker.js 2>/dev/null | grep -q "$V"; then
             if ! git diff --quiet HEAD~1 HEAD -- public/; then
               echo "::error::public/ changed but $V was not bumped in service-worker.js"
@@ -27,7 +31,24 @@ jobs:
             fi
           fi
 
-      - uses: cloudflare/wrangler-action@v3
+      # Until the repo secrets exist, check the build and stop there instead of
+      # failing. The desk data lives in KV, so a deploy from here ships code only.
+      - name: Skip deploy when Cloudflare secrets are not set
+        if: env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == ''
+        run: echo "::notice::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set; skipping deploy. Deploy locally with npx wrangler deploy."
+
+      - uses: actions/setup-node@v5
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          node-version: 22
+          cache: npm
+
+      # The repo's own wrangler (v4, from package-lock.json), not the action's
+      # bundled v3, which cannot read wrangler.jsonc.
+      - run: npm ci
+
+      - name: Check the Worker builds
+        run: npx wrangler deploy --dry-run --outdir dist
+
+      - name: Deploy
+        if: env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != ''
+        run: npx wrangler deploy
