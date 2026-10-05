@@ -1,12 +1,19 @@
 {
   // Static-assets Worker, the same shape as footballregister.
   // Deploy:  npx wrangler deploy
+  // Cloudflare Access must cover km.richardmcallister.app before the first deploy.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "km-desk",
   "compatibility_date": "2026-10-05",
   "assets": {
     "directory": "./public"
   },
+  // Only the Access-protected hostname: no guessable workers.dev or preview URLs.
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "km.richardmcallister.app", "custom_domain": true }
+  ],
   "observability": {
     "enabled": true
   }
