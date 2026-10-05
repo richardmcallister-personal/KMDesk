@@ -140,6 +140,8 @@ button, input, textarea { font: inherit; color: inherit; }
   background: var(--bg); border-bottom: 1px solid var(--rule);
 }
 #apphead .brand { margin-top: 0; }
+#recheck.spin svg { animation: km-spin 0.8s linear infinite; }
+@keyframes km-spin { to { transform: rotate(360deg); } }
 #apphead .stamp { margin-top: 0; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
 
 /* ---- pane ---- */
@@ -285,7 +287,7 @@ h2.sec { margin: 26px 0 10px; font-size: 12px; font-weight: 500; letter-spacing:
 <div id="app">
   <header id="apphead">
     <div class="brand" role="img" aria-label="KEVIN.MURPHY"></div>
-    <div class="stamp">5 Oct &middot; 08.50</div>
+    <div class="stamp"></div>
   </header>
 
   <div id="pane" role="main"></div>
@@ -307,7 +309,8 @@ var DATA = { owe: [], owed: [], prj: [], dec: [] };
 var LOADED = false;
 var LOAD_ERR = null;
 
-var STAMP = "Rebuilt 5 Oct 2026, 08.50 CET";
+var BUILT = null;     /* when the rebuild wrote desk.json */
+var FETCHED = null;   /* when this app last read it */
 var DESK_URL = "https://claude.ai/code/artifact/fb499e12-349a-4da5-8b82-e6046d23d692";
 
 /* Marketplace, from Pi at the 5 Oct rebuild. MTD and FYTD run to 4 Oct:
@@ -330,6 +333,26 @@ function live(list) {
 }
 function oweLive() { return live(DATA.owe); }
 function owedLive() { return live(DATA.owed); }
+function fmtWhen(d) {
+  if (!d) return "";
+  var now = new Date();
+  var hm = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }).replace(":", ".");
+  if (d.toDateString() === now.toDateString()) return "today " + hm;
+  var y = new Date(now); y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return "yesterday " + hm;
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + " " + hm;
+}
+function stampLine() {
+  if (!LOADED) return "Reading the desk\u2026";
+  if (LOAD_ERR) return "Could not read the desk";
+  var n = oweLive().filter(function (r) { return days(r.age) === 0; }).length;
+  return (BUILT ? "Rebuilt " + fmtWhen(BUILT) : "Rebuild time not recorded")
+    + (n ? " \u00b7 " + n + " new since the last run" : "");
+}
+function greeting() {
+  var h = new Date().getHours();
+  return h < 12 ? "Morning" : h < 18 ? "Afternoon" : "Evening";
+}
 function days(a) { var n = parseInt(a, 10); return isNaN(n) ? 0 : n; }
 
 /* ---------- icons ---------- */
@@ -384,10 +407,10 @@ function viewToday() {
 
   var mtd = MKT.mtd || {};
   var h = '<div class="hello"><div>'
-    + '<div class="eyebrow">Monday 5 October</div>'
-    + '<h1 class="view">Morning, Richard</h1></div>'
-    + '<button type="button" class="iconbtn" id="recheck" aria-label="Check for new mail now">' + svg(IC.refresh) + '</button></div>'
-    + '<div class="stamp">' + esc(STAMP) + ' · 1 new since the last run</div>';
+    + '<div class="eyebrow">' + esc(new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })) + '</div>'
+    + '<h1 class="view">' + greeting() + ', Richard</h1></div>'
+    + '<button type="button" class="iconbtn" id="recheck" aria-label="Reload the desk">' + svg(IC.refresh) + '</button></div>'
+    + '<div class="stamp">' + esc(stampLine()) + '</div>';
 
   h += '<div class="focuscard"><div class="focushead"><span class="dot"></span><span class="eyebrow">Focus</span></div>'
     + '<label class="sr" for="focus">Focus for today</label>'
@@ -505,9 +528,9 @@ function viewMore() {
     + '<h2 class="sec">Display</h2><div class="card">'
     + '<button type="button" class="linkrow" id="themebtn" style="width:100%;background:transparent;border:0;cursor:pointer"><span>Theme</span><span class="r" id="themeval">System</span></button>'
     + '</div>'
-    + '<h2 class="sec">This prototype</h2>'
+    + '<h2 class="sec">About the data</h2>'
     + '<div class="bigcard" style="margin-top:0">'
-    + '<p class="note" style="margin:0">Content is frozen at the 5 October 08.50 rebuild. Ticks, closes and the Focus note are kept in this browser only — they do not reach the desk, the shared closed register or anyone else, and they clear if you clear site data. Mail links open the real Outlook thread.</p>'
+    + '<p class="note" style="margin:0">' + esc(BUILT ? 'Content is from the rebuild ' + fmtWhen(BUILT) + '.' : 'Content is from the last rebuild.') + ' Refresh reloads the latest rebuild; it does not check mail itself. Ticks, closes and the Focus note are kept in this browser only — they do not reach the desk, the shared closed register or anyone else, and they clear if you clear site data. Mail links open the real Outlook thread.</p>'
     + '</div>';
   return h;
 }
@@ -607,11 +630,15 @@ function closeItem(kind, key, label) {
   save();
   lastClosed = key;
   var msg = (label || "Item") + " closed";
+  showToast(msg, true);
+}
+function showToast(msg, undo) {
   var t = document.getElementById("toast");
   document.getElementById("toast-msg").textContent = msg;
+  document.getElementById("toast-undo").hidden = !undo;
   t.hidden = false;
   if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(function () { t.hidden = true; lastClosed = null; }, 6000);
+  toastTimer = setTimeout(function () { t.hidden = true; lastClosed = null; }, undo ? 6000 : 4000);
 }
 document.getElementById("toast-undo").addEventListener("click", function () {
   if (lastClosed) { delete state.closed[lastClosed]; save(); lastClosed = null; }
@@ -706,11 +733,8 @@ document.addEventListener("click", function (ev) {
     return;
   }
   if (el.id === "recheck") {
-    var t2 = document.getElementById("toast");
-    document.getElementById("toast-msg").textContent = "Live mail check needs the connector — not wired in this prototype";
-    t2.hidden = false;
-    if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t2.hidden = true; }, 5000);
+    el.classList.add("spin");
+    loadDesk(true).then(function () { el.classList.remove("spin"); });
     return;
   }
 });
@@ -733,11 +757,12 @@ render();
 function syncOnline() {
   var s = document.querySelector("#apphead .stamp");
   if (!s) return;
+  var when = BUILT ? fmtWhen(BUILT) : "";
   if (navigator.onLine) {
-    s.textContent = "5 Oct \u00b7 08.50";
+    s.textContent = when;
     s.style.color = "";
   } else {
-    s.textContent = "Offline \u00b7 5 Oct";
+    s.textContent = "Offline" + (when ? " \u00b7 " + when : "");
     s.style.color = "var(--accent)";
   }
 }
@@ -746,28 +771,48 @@ window.addEventListener("offline", syncOnline);
 syncOnline();
 
 
-/* The desk is data, not code: it lives in data/desk.json so the repo carries
-   none of it. Offline, the service worker serves the cached copy. */
-(function () {
-  fetch("./data/desk.json", { cache: "no-store" })
+/* The desk is data, not code: the Worker serves data/desk.json from KV, where
+   each rebuild writes it. Offline, the service worker serves the last copy. */
+function loadDesk(manual) {
+  var before = BUILT ? BUILT.getTime() : null;
+  return fetch("./data/desk.json", { cache: "no-store" })
     .then(function (r) {
       if (!r.ok) throw new Error("data/desk.json returned " + r.status);
-      return r.json();
+      var w = r.headers.get("X-Desk-Written");
+      return r.json().then(function (d) { return { d: d, w: w }; });
     })
-    .then(function (d) {
-      if (d && d.owe && d.owed && d.prj && d.dec) {
-        DATA = d; MKT = d.mkt || {}; ECOM = d.ecom || {};
-        LOADED = true; LOAD_ERR = null;
+    .then(function (x) {
+      var d = x.d;
+      if (!(d && d.owe && d.owed && d.prj && d.dec)) throw new Error("data/desk.json is not in the expected shape.");
+      DATA = d; MKT = d.mkt || {}; ECOM = d.ecom || {};
+      var b = d.built || x.w;
+      BUILT = b && !isNaN(Date.parse(b)) ? new Date(b) : null;
+      FETCHED = new Date();
+      LOADED = true; LOAD_ERR = null;
+      render(); syncOnline();
+      if (manual) {
+        if (!navigator.onLine) showToast("Offline — showing the copy from " + (BUILT ? fmtWhen(BUILT) : "the last load"));
+        else if (BUILT && before === BUILT.getTime()) showToast("Up to date — next rebuild is due at " + nextRebuild());
+        else showToast("Updated to the rebuild " + (BUILT ? fmtWhen(BUILT) : "just written"));
       }
-      else { LOADED = true; LOAD_ERR = "data/desk.json is not in the expected shape."; }
-      render();
     })
     .catch(function (e) {
-      LOADED = true;
-      LOAD_ERR = (e && e.message) || "data/desk.json could not be read.";
-      render();
+      var msg = (e && e.message) || "data/desk.json could not be read.";
+      if (!DATA.owe.length) { LOADED = true; LOAD_ERR = msg; render(); }
+      if (manual) showToast("Could not reload the desk — " + msg);
     });
-})();
+}
+/* The rebuild runs at 06.00, 12.00 and 18.00 (CET). */
+function nextRebuild() {
+  var h = parseInt(new Date().toLocaleString("en-GB", { timeZone: "Europe/Berlin", hour: "2-digit", hourCycle: "h23" }), 10);
+  return (h < 6 ? "06.00" : h < 12 ? "12.00" : h < 18 ? "18.00" : "06.00 tomorrow") + " CET";
+}
+loadDesk(false);
+
+/* Coming back to the app picks up a newer rebuild without a tap. */
+document.addEventListener("visibilitychange", function () {
+  if (document.visibilityState === "visible" && (!FETCHED || Date.now() - FETCHED.getTime() > 60000)) loadDesk(false);
+});
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", function () {

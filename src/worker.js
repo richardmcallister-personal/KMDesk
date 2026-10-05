@@ -13,7 +13,7 @@ export default {
       if (request.method !== "GET" && request.method !== "HEAD") {
         return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
       }
-      const desk = await env.DESK.get(DESK_KEY, { type: "stream" });
+      const { value: desk, metadata } = await env.DESK.getWithMetadata(DESK_KEY, { type: "stream" });
       if (!desk) {
         return Response.json({ error: "The desk has not been written yet." }, {
           status: 404,
@@ -26,6 +26,8 @@ export default {
           // Private data behind Access: never let a shared cache keep it.
           "Cache-Control": "private, no-store",
           "X-Content-Type-Options": "nosniff",
+          // When desk:put wrote it, for the app's "Rebuilt ..." line.
+          ...(metadata && metadata.written ? { "X-Desk-Written": metadata.written } : {}),
         },
       });
     }

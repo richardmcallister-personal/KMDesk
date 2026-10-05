@@ -78,7 +78,7 @@ Or push to `main` and let the Action run it, with two repo secrets:
 
 The workflow fails the deploy if `public/` changed without `CACHE` being bumped
 in `public/service-worker.js`. Without that bump, installed phones keep serving
-the shell they already cached. It is currently `km-desk-v3`.
+the shell they already cached. It is currently `km-desk-v4`.
 
 ## 4. Hostname
 
@@ -100,7 +100,9 @@ To update the desk, no deploy needed:
 npm run desk:put -- path/to/desk.json
 ```
 
-That checks the file is valid JSON and writes it to KV. The app shows it the
+That checks the file is valid JSON and writes it to KV with the write time,
+which the app shows as "Rebuilt ...". If `desk.json` has a top-level `"built"`
+ISO timestamp, the app uses that instead. The app shows it the
 next time it is opened with signal. The 06.00 / 12.00 / 18.00 rebuild should do
 the same (`wrangler kv key put --binding DESK --remote desk.json --path ...`, or
 the KV REST API) instead of writing a file.
@@ -127,7 +129,7 @@ src/worker.js                  serves /data/desk.json from KV
 scripts/put-desk.sh            npm run desk:put — writes the desk to KV
 public/.assetsignore           keeps desk.json out of static assets
 public/data/desk.sample.json   the shape, committed
-public/service-worker.js       precache + offline, cache km-desk-v3
+public/service-worker.js       precache + offline, cache km-desk-v4
 public/manifest.webmanifest    installable, standalone, shortcuts
 public/fonts /img /icons       Murphy Sans, wordmarks, app tiles
 ```
