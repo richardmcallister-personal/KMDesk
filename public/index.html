@@ -312,7 +312,7 @@ var DATA = { owe: [], owed: [], prj: [], dec: [] };
 var LOADED = false;
 var LOAD_ERR = null;
 
-var APP_VERSION = "km-desk-v6";  /* keep in step with CACHE in service-worker.js */
+var APP_VERSION = "km-desk-v7";  /* keep in step with CACHE in service-worker.js */
 var BUILT = null;     /* when the rebuild wrote desk.json */
 var FETCHED = null;   /* when this app last read it */
 var DESK_URL = "https://claude.ai/code/artifact/fb499e12-349a-4da5-8b82-e6046d23d692";
@@ -466,8 +466,10 @@ function viewOwe() {
 
 function viewNumbers() {
   var p = MKT[state.period];
-  if (!LOADED || !p) {
-    return '<h1 class="view">Numbers</h1>' + loadingCard();
+  if (!LOADED || LOAD_ERR) return '<h1 class="view">Numbers</h1>' + loadingCard();
+  if (!p) {
+    return '<h1 class="view">Numbers</h1><div class="empty"><div class="big">No figures in this rebuild</div>'
+      + '<p>The last rebuild did not include the marketplace or e-commerce numbers. They come back when the rebuild sends them again.</p></div>';
   }
   var h = '<h1 class="view">Numbers</h1><p class="sub-line">Two separate channels · marketplace sell-out from Pattern Intelligence, e-commerce (DTC) from the month-end recap</p>'
     + '<div class="chips">'
@@ -779,6 +781,47 @@ syncOnline();
 
 /* The desk is data, not code: the Worker serves data/desk.json from KV, where
    each rebuild writes it. Offline, the service worker serves the last copy. */
+/* Accept the rebuild's field names as well as the original ones, so a
+   renamed field shows up as text rather than a blank screen. */
+function srcLink(href, label) {
+  return typeof href === "string" && /^https:\/\//.test(href) ? [{ label: label, href: href }] : [];
+}
+function humanKey(k) {
+  var s = String(k || "").replace(/^(prj|owe|owed|dec)-/, "").replace(/-/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function normDesk(d) {
+  function person(r) {
+    return {
+      key: r.key, who: r.who || "", hot: !!r.hot,
+      age: r.age != null ? String(r.age) : (r.age_days != null ? r.age_days + "d" : ""),
+      sub: r.sub || r.detail || r.summary || "",
+      links: r.links || srcLink(r.source, "Mail")
+    };
+  }
+  return {
+    owe: (d.owe || []).map(person),
+    owed: (d.owed || []).map(person),
+    prj: (d.prj || []).map(function (r) {
+      return {
+        key: r.key, name: r.name || r.title || humanKey(r.key),
+        owner: r.owner || "", when: r.when || "",
+        next: r.next || r.next_step || "", log: r.log || [],
+        links: r.links || srcLink(r.asana, "Asana").concat(srcLink(r.source, "Mail"))
+      };
+    }),
+    dec: (d.dec || []).map(function (r) {
+      return {
+        key: r.key, date: r.date || "",
+        what: r.what || r.decision || "", why: r.why || r.because || "",
+        links: r.links || srcLink(r.source, "Mail")
+      };
+    }),
+    mkt: d.mkt || {}, ecom: d.ecom || {},
+    built: d.built || (d.rebuilt && d.rebuilt.iso) || null
+  };
+}
+
 function loadDesk(manual) {
   var before = BUILT ? BUILT.getTime() : null;
   return fetch("./data/desk.json", { cache: "no-store" })
@@ -788,8 +831,8 @@ function loadDesk(manual) {
       return r.json().then(function (d) { return { d: d, w: w }; });
     })
     .then(function (x) {
-      var d = x.d;
-      if (!(d && d.owe && d.owed && d.prj && d.dec)) throw new Error("data/desk.json is not in the expected shape.");
+      if (!(x.d && x.d.owe && x.d.owed && x.d.prj && x.d.dec)) throw new Error("data/desk.json is not in the expected shape.");
+      var d = normDesk(x.d);
       DATA = d; MKT = d.mkt || {}; ECOM = d.ecom || {};
       var b = d.built || x.w;
       BUILT = b && !isNaN(Date.parse(b)) ? new Date(b) : null;

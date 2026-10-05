@@ -65,12 +65,34 @@ async function ingest(request, env, url) {
 
   const written = new Date().toISOString();
   await env.DESK.put(DESK_KEY, body, { metadata: { written } });
-  // Report counts only, never content.
+  // Report counts and shape problems only, never content.
   return Response.json({
     ok: true,
     written,
     counts: Object.fromEntries(REQUIRED.map((k) => [k, desk[k].length])),
+    warnings: shapeWarnings(desk),
   });
+}
+
+// The app's field names (see public/data/desk.sample.json). Anything missing
+// is reported back so the rebuild's run summary shows it.
+const FIELDS = {
+  owe: ["key", "who", "age", "hot", "sub", "links"],
+  owed: ["key", "who", "age", "hot", "sub", "links"],
+  prj: ["key", "name", "owner", "when", "next", "log", "links"],
+  dec: ["key", "date", "what", "why", "links"],
+};
+function shapeWarnings(desk) {
+  const out = [];
+  for (const [list, fields] of Object.entries(FIELDS)) {
+    for (const f of fields) {
+      const n = desk[list].filter((r) => !r || r[f] === undefined || r[f] === null || r[f] === "").length;
+      if (n) out.push(`${list}: ${n} of ${desk[list].length} items have no "${f}"`);
+    }
+  }
+  for (const k of ["mkt", "ecom"]) if (!desk[k]) out.push(`"${k}" is missing, so the Numbers tab is empty`);
+  if (!desk.built) out.push('"built" is missing; the app shows the write time instead');
+  return out;
 }
 
 function reply(status, error) {
