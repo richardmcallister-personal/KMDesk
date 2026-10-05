@@ -4,7 +4,8 @@
   "description": "Deputy CEO Desk - installable mobile app",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "desk:put": "scripts/put-desk.sh"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

@@ -2,13 +2,14 @@
    Cache-first for the shell so the app opens on a plane. Bump CACHE on every
    deploy: the old cache is deleted on activate and clients reload once. */
 
-var CACHE = "km-desk-v2";
+var CACHE = "km-desk-v3";
+
+var DESK = "./data/desk.json";
 
 var SHELL = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
-  "./data/desk.json",
   "./fonts/murphy-sans-300.ttf",
   "./fonts/murphy-sans-500.ttf",
   "./img/wordmark-ink.png",
@@ -54,6 +55,27 @@ self.addEventListener("fetch", function (e) {
     e.respondWith(
       fetch(req).catch(function () {
         return caches.match("./index.html");
+      })
+    );
+    return;
+  }
+
+  // The desk: network first so each rebuild shows up on the next open, with
+  // the last good copy kept for when there is no signal.
+  if (url.pathname.endsWith("/data/desk.json")) {
+    e.respondWith(
+      fetch(req).then(function (res) {
+        if (res && res.ok) {
+          var copy = res.clone();
+          caches.open(CACHE).then(function (c) { c.put(DESK, copy); });
+          return res;
+        }
+        return caches.match(DESK).then(function (hit) { return hit || res; });
+      }).catch(function () {
+        return caches.match(DESK).then(function (hit) {
+          if (hit) return hit;
+          throw new Error("offline and no saved copy of the desk");
+        });
       })
     );
     return;

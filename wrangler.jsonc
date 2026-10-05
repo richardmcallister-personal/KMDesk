@@ -1,13 +1,20 @@
 {
-  // Static-assets Worker, the same shape as footballregister.
+  // Static shell from ./public, the desk from KV (see src/worker.js).
   // Deploy:  npx wrangler deploy
-  // Cloudflare Access must cover km.richardmcallister.app before the first deploy.
+  // Cloudflare Access must cover km.richardmcallister.app before any deploy.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "km-desk",
+  "main": "src/worker.js",
   "compatibility_date": "2026-10-05",
   "assets": {
-    "directory": "./public"
+    "directory": "./public",
+    "binding": "ASSETS",
+    // The desk is served by the Worker from KV, never as a static file.
+    "run_worker_first": ["/data/desk.json"]
   },
+  "kv_namespaces": [
+    { "binding": "DESK", "id": "51657938b0194d538add1a577437db41" }
+  ],
   // Only the Access-protected hostname: no guessable workers.dev or preview URLs.
   "workers_dev": false,
   "preview_urls": false,
