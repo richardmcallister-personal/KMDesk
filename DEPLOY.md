@@ -94,18 +94,42 @@ with `Cache-Control: private, no-store`; everything else comes from `public/`.
 `public/.assetsignore` stops a stray local `desk.json` ever shipping as a static
 file.
 
-To update the desk, no deploy needed:
+### How the scheduled rebuild writes it
+
+The rebuild is a Claude scheduled task in a fresh cloud sandbox, so it has no
+repo, no wrangler and should hold no Cloudflare API token (a KV-write token
+covers every namespace on the account, and a task prompt is stored in plain
+text). It writes through the Worker instead:
+
+```bash
+curl -sS -X PUT "https://km-ingest.richardmcallister.app/desk" \
+  -H "Authorization: Bearer $DESK_WRITE_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @desk.json
+# → {"ok":true,"written":"…","counts":{"owe":19,"owed":5,"prj":16,"dec":6}}
+```
+
+`km-ingest.richardmcallister.app` is deliberately outside Access and answers
+only `PUT /desk` with the right key; everything else is 404. The key can
+overwrite the desk but cannot read it. The Worker rejects anything that is not
+JSON with `owe`, `owed`, `prj` and `dec` lists, so a broken run cannot blank
+the app. Add a top-level `"built"` ISO timestamp and the app shows that as the
+rebuild time; otherwise it shows the write time.
+
+Rotate the key (and update the task) with:
+
+```bash
+npx wrangler secret put DESK_WRITE_KEY
+```
+
+### By hand
 
 ```bash
 npm run desk:put -- path/to/desk.json
 ```
 
-That checks the file is valid JSON and writes it to KV with the write time,
-which the app shows as "Rebuilt ...". If `desk.json` has a top-level `"built"`
-ISO timestamp, the app uses that instead. The app shows it the
-next time it is opened with signal. The 06.00 / 12.00 / 18.00 rebuild should do
-the same (`wrangler kv key put --binding DESK --remote desk.json --path ...`, or
-the KV REST API) instead of writing a file.
+That checks the file is valid JSON and writes it straight to KV using your own
+wrangler login.
 
 Because the data is no longer in the deploy, pushing to `main` is now safe: the
 Action ships code only. Add the two repo secrets when you want it to deploy.

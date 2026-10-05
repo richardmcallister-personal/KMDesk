@@ -19,8 +19,14 @@
   "workers_dev": false,
   "preview_urls": false,
   "routes": [
-    { "pattern": "km.richardmcallister.app", "custom_domain": true }
+    { "pattern": "km.richardmcallister.app", "custom_domain": true },
+    // Write-only door for the scheduled rebuild. No Access, no reads: see src/worker.js.
+    { "pattern": "km-ingest.richardmcallister.app", "custom_domain": true }
   ],
+  "vars": {
+    "INGEST_HOST": "km-ingest.richardmcallister.app"
+  },
+  // Secret, set with:  npx wrangler secret put DESK_WRITE_KEY
   "observability": {
     "enabled": true
   }
