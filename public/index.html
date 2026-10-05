@@ -145,7 +145,7 @@ button, input, textarea { font: inherit; color: inherit; }
 #apphead .stamp { margin-top: 0; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
 
 /* ---- pane ---- */
-#pane { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 22px 16px 26px; }
+#pane { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 22px 16px 26px; }
 #pane::-webkit-scrollbar { width: 0; }
 
 h1.view { margin: 0; font-size: 27px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.1; text-wrap: balance; }
@@ -165,6 +165,9 @@ h2.sec { margin: 26px 0 10px; font-size: 12px; font-weight: 500; letter-spacing:
 .rowmain:hover { background: var(--rule-soft); }
 .rowtext { flex: 1 1 auto; min-width: 0; }
 .rowwho { font-size: 15px; font-weight: 500; line-height: 1.3; }
+.needlist { max-height: 62vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.needlist .rowsub { -webkit-line-clamp: 5; }
+.scrollhint { margin-top: 8px; }
 .rowsub { margin-top: 2px; font-size: 12.5px; line-height: 1.4; color: var(--fg-soft); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .age { flex: 0 0 auto; font-size: 12.5px; font-weight: 500; color: var(--fg-soft); }
 .age.hot { color: var(--accent); }
@@ -249,7 +252,7 @@ h2.sec { margin: 26px 0 10px; font-size: 12px; font-weight: 500; letter-spacing:
 .sheettop { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 14px 0; }
 .backbtn { min-height: 44px; display: flex; align-items: center; gap: 6px; padding: 0 12px 0 8px; border-radius: 22px; background: transparent; border: 0; color: var(--sheet-soft); cursor: pointer; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; }
 .sheetpos { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--sheet-soft); padding-right: 6px; }
-.sheetbody { flex: 1 1 auto; overflow-y: auto; padding: 14px 20px 18px; }
+.sheetbody { flex: 1 1 auto; min-height: 0; -webkit-overflow-scrolling: touch; overflow-y: auto; padding: 14px 20px 18px; }
 .sheetbody::-webkit-scrollbar { width: 0; }
 .tagrow { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
 .tag { font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; border-radius: 10px; }
@@ -309,7 +312,7 @@ var DATA = { owe: [], owed: [], prj: [], dec: [] };
 var LOADED = false;
 var LOAD_ERR = null;
 
-var APP_VERSION = "km-desk-v5";  /* keep in step with CACHE in service-worker.js */
+var APP_VERSION = "km-desk-v6";  /* keep in step with CACHE in service-worker.js */
 var BUILT = null;     /* when the rebuild wrote desk.json */
 var FETCHED = null;   /* when this app last read it */
 var DESK_URL = "https://claude.ai/code/artifact/fb499e12-349a-4da5-8b82-e6046d23d692";
@@ -404,7 +407,7 @@ function viewToday() {
     var an = days(a.age) === 0 ? 1 : 0, bn = days(b.age) === 0 ? 1 : 0;
     if (an !== bn) return bn - an;
     return days(b.age) - days(a.age);
-  }).slice(0, 3);
+  });
 
   var mtd = MKT.mtd || {};
   var h = '<div class="hello"><div>'
@@ -428,7 +431,8 @@ function viewToday() {
   } else if (!top.length) {
     h += '<div class="empty"><div class="big">Nothing owed by you</div><p>Every commitment on the desk is closed. New mail lands at the next rebuild — 06.00, 12.00 and 18.00 Copenhagen time.</p></div>';
   } else {
-    h += '<div class="card">' + top.map(function (r) { return rowHTML(r, "owe"); }).join("") + '</div>';
+    h += '<div class="card needlist" tabindex="0" aria-label="Everything you owe, scrollable">' + top.map(function (r) { return rowHTML(r, "owe"); }).join("") + '</div>';
+    if (top.length > 3) h += '<p class="note scrollhint">Scroll the list for all ' + top.length + ' \u00b7 tap any item for the full detail</p>';
     h += '<p class="note">' + owe.length + ' owed by you, ' + hot.length + ' of them over a week. ' + owed.length + ' owed to you.</p>';
   }
   return h;

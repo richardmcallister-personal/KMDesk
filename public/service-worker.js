@@ -2,7 +2,7 @@
    Cache-first for the shell so the app opens on a plane. Bump CACHE on every
    deploy: the old cache is deleted on activate and clients reload once. */
 
-var CACHE = "km-desk-v5";
+var CACHE = "km-desk-v6";
 
 var DESK = "./data/desk.json";
 
