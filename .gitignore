@@ -1,0 +1,7 @@
+node_modules/
+.wrangler/
+.dev.vars
+.DS_Store
+
+# the desk itself - never committed
+public/data/desk.json

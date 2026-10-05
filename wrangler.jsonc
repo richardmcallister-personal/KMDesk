@@ -1,0 +1,13 @@
+{
+  // Static-assets Worker, the same shape as footballregister.
+  // Deploy:  npx wrangler deploy
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "km-desk",
+  "compatibility_date": "2026-10-05",
+  "assets": {
+    "directory": "./public"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

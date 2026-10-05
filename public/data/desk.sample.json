@@ -1,0 +1,130 @@
+{
+ "_": "Shape only. The real file is public/data/desk.json and is git-ignored. 'key' must match the data-key on the desk - the closed register is keyed on it.",
+ "owe": [
+  {
+   "key": "owe-example-slug",
+   "who": "Name, or Company — Name",
+   "age": "12d",
+   "hot": true,
+   "sub": "One paragraph: what you owe them and where it stands.",
+   "links": [
+    {
+     "label": "Mail",
+     "href": "https://outlook.office365.com/owa/?ItemID=…"
+    }
+   ]
+  }
+ ],
+ "owed": [
+  {
+   "key": "owed-example-slug",
+   "who": "Name",
+   "age": "3d",
+   "hot": false,
+   "sub": "What they owe you.",
+   "links": []
+  }
+ ],
+ "prj": [
+  {
+   "key": "prj-example-slug",
+   "name": "Project name",
+   "owner": "Richard",
+   "when": "2 Oct",
+   "next": "The next step.",
+   "log": [
+    {
+     "d": "2 Oct",
+     "t": "What moved."
+    }
+   ],
+   "links": []
+  }
+ ],
+ "dec": [
+  {
+   "key": "dec-example-slug",
+   "date": "2 Oct",
+   "what": "The decision.",
+   "why": "The reasoning, and what was rejected.",
+   "links": []
+  }
+ ],
+ "mkt": {
+  "mtd": {
+   "label": "October to date",
+   "span": "1–4 October",
+   "total": "$0",
+   "units": "0 units",
+   "rows": [
+    [
+     "Amazon US",
+     "$0",
+     0,
+     0
+    ]
+   ],
+   "buybox": "0%",
+   "instock": "0%",
+   "conv": "0%",
+   "organic": "0%",
+   "lost": "$0",
+   "share": "0%",
+   "flag": "One sentence on what the numbers mean.",
+   "buyboxShort": "0%",
+   "buyboxDelta": "Buy box, flat"
+  },
+  "last": {
+   "label": "October to date",
+   "span": "1–4 October",
+   "total": "$0",
+   "units": "0 units",
+   "rows": [
+    [
+     "Amazon US",
+     "$0",
+     0,
+     0
+    ]
+   ],
+   "buybox": "0%",
+   "instock": "0%",
+   "conv": "0%",
+   "organic": "0%",
+   "lost": "$0",
+   "share": "0%",
+   "flag": "One sentence on what the numbers mean.",
+   "buyboxShort": null,
+   "buyboxDelta": null
+  },
+  "fytd": {
+   "label": "October to date",
+   "span": "1–4 October",
+   "total": "$0",
+   "units": "0 units",
+   "rows": [
+    [
+     "Amazon US",
+     "$0",
+     0,
+     0
+    ]
+   ],
+   "buybox": "0%",
+   "instock": "0%",
+   "conv": "0%",
+   "organic": "0%",
+   "lost": "$0",
+   "share": "0%",
+   "flag": "One sentence on what the numbers mean.",
+   "buyboxShort": null,
+   "buyboxDelta": null
+  }
+ },
+ "ecom": {
+  "month": "September final",
+  "val": "$0",
+  "vs": "0% on budget",
+  "q": "Quarter commentary."
+ }
+}

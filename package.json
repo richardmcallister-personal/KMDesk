@@ -1,0 +1,12 @@
+{
+  "name": "km-desk",
+  "private": true,
+  "description": "Deputy CEO Desk - installable mobile app",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
