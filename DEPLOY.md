@@ -78,7 +78,7 @@ Or push to `main` and let the Action run it, with two repo secrets:
 
 The workflow fails the deploy if `public/` changed without `CACHE` being bumped
 in `public/service-worker.js`. Without that bump, installed phones keep serving
-the shell they already cached. It is currently `km-desk-v4`.
+the shell they already cached. It is currently `km-desk-v5`.
 
 ## 4. Hostname
 
@@ -153,7 +153,7 @@ src/worker.js                  serves /data/desk.json from KV
 scripts/put-desk.sh            npm run desk:put — writes the desk to KV
 public/.assetsignore           keeps desk.json out of static assets
 public/data/desk.sample.json   the shape, committed
-public/service-worker.js       precache + offline, cache km-desk-v4
+public/service-worker.js       precache + offline, cache km-desk-v5
 public/manifest.webmanifest    installable, standalone, shortcuts
 public/fonts /img /icons       Murphy Sans, wordmarks, app tiles
 ```

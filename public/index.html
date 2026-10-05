@@ -309,6 +309,7 @@ var DATA = { owe: [], owed: [], prj: [], dec: [] };
 var LOADED = false;
 var LOAD_ERR = null;
 
+var APP_VERSION = "km-desk-v5";  /* keep in step with CACHE in service-worker.js */
 var BUILT = null;     /* when the rebuild wrote desk.json */
 var FETCHED = null;   /* when this app last read it */
 var DESK_URL = "https://claude.ai/code/artifact/fb499e12-349a-4da5-8b82-e6046d23d692";
@@ -531,6 +532,7 @@ function viewMore() {
     + '<h2 class="sec">About the data</h2>'
     + '<div class="bigcard" style="margin-top:0">'
     + '<p class="note" style="margin:0">' + esc(BUILT ? 'Content is from the rebuild ' + fmtWhen(BUILT) + '.' : 'Content is from the last rebuild.') + ' Refresh reloads the latest rebuild; it does not check mail itself. Ticks, closes and the Focus note are kept in this browser only — they do not reach the desk, the shared closed register or anyone else, and they clear if you clear site data. Mail links open the real Outlook thread.</p>'
+    + '<p class="note" style="margin:8px 0 0">App version ' + APP_VERSION + '</p>'
     + '</div>';
   return h;
 }
@@ -814,9 +816,23 @@ document.addEventListener("visibilitychange", function () {
   if (document.visibilityState === "visible" && (!FETCHED || Date.now() - FETCHED.getTime() > 60000)) loadDesk(false);
 });
 
+/* Updates install themselves: check for a new service worker whenever the app
+   comes back to the foreground, and reload once when one takes over, so a
+   deploy reaches the phone without force-quitting the app. */
 if ("serviceWorker" in navigator) {
+  var hadController = !!navigator.serviceWorker.controller, reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", function () {
+    if (!hadController) { hadController = true; return; }   /* first install: nothing to replace */
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
   window.addEventListener("load", function () {
-    navigator.serviceWorker.register("./service-worker.js").catch(function () {});
+    navigator.serviceWorker.register("./service-worker.js", { updateViaCache: "none" }).then(function (reg) {
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "visible") reg.update().catch(function () {});
+      });
+    }).catch(function () {});
   });
 }
 </script>
