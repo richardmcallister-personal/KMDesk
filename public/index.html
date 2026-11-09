@@ -354,11 +354,21 @@ h2.sec { margin: 26px 0 10px; font-size: 12px; font-weight: 500; letter-spacing:
   h1.view { font-size: 34px; }
   .sub-line { font-size: 13.5px; }
 
+  /* The reading pane takes the app's own theme, light or dark, rather than
+     the always-dark sheet the phone uses. */
+  #app {
+    --sheet-bg: var(--bg); --sheet-fg: var(--fg); --sheet-soft: var(--fg-soft);
+    --sheet-rule: var(--rule); --sheet-raise: var(--bg); --sheet-accent: var(--coral);
+  }
   #sheet {
     grid-area: sheet; position: static; z-index: auto;
-    border-left: 1px solid var(--sheet-rule);
+    border-left: 1px solid var(--rule);
     transition: none;
   }
+  #sheet .src { color: var(--accent); border-color: var(--accent); }
+  #sheet .src.quiet { color: var(--fg-soft); border-color: var(--rule); }
+  #sheet .tag.cool { background: var(--blue-tint); color: var(--blue); }
+  #sheet .sheetact { border-top-color: var(--rule); }
   #sheet.enter { transform: none; opacity: 1; }
   .sheettop { padding: 18px 22px 0; }
   .sheetbody { padding: 18px 32px 28px; }
@@ -435,7 +445,7 @@ var DATA = { owe: [], owed: [], prj: [], dec: [] };
 var LOADED = false;
 var LOAD_ERR = null;
 
-var APP_VERSION = "km-desk-v8";  /* keep in step with CACHE in service-worker.js */
+var APP_VERSION = "km-desk-v9";  /* keep in step with CACHE in service-worker.js */
 var BUILT = null;     /* when the rebuild wrote desk.json */
 var FETCHED = null;   /* when this app last read it */
 var DESK_URL = "https://claude.ai/code/artifact/fb499e12-349a-4da5-8b82-e6046d23d692";
@@ -448,12 +458,13 @@ var ECOM = {};
 
 /* ---------- local-only state (this browser) ---------- */
 var LS = "kmdesk-mobile-v1";
-var state = { tab: "today", filter: "owe", hotOnly: false, period: "mtd", focus: "", closed: {} };
+var state = { tab: "today", filter: "owe", hotOnly: false, period: "mtd", focus: "", closed: {}, theme: "" };
 try {
   var raw = localStorage.getItem(LS);
   if (raw) { var p = JSON.parse(raw); if (p && typeof p === "object") { for (var k in state) if (p[k] !== undefined) state[k] = p[k]; } }
 } catch (e) {}
 function save() { try { localStorage.setItem(LS, JSON.stringify(state)); } catch (e) {} }
+if (state.theme === "light" || state.theme === "dark") document.documentElement.setAttribute("data-theme", state.theme);
 
 function live(list) {
   return list.filter(function (r) { return !state.closed[r.key]; });
@@ -607,7 +618,27 @@ function viewOwe() {
    The rebuild sends each period as tiles {num, label, delta} and tables
    {head, rows}. Render whatever arrives; the original fixed shape is kept as a
    fallback so an older desk.json still reads. */
-function isGeneric(p) { return !!(p && (p.tiles || p.marketplaces || p.trading_health)); }
+/* Find content by its shape rather than its field name: the rebuild renames
+   fields from run to run (tiles/stats, trading_health/amazon_us_trading_health). */
+function isTable(v) { return !!(v && typeof v === "object" && Array.isArray(v.rows)); }
+function isTiles(v) { return Array.isArray(v) && v.length > 0 && v[0] && typeof v[0] === "object" && "num" in v[0]; }
+function pickTiles(o) {
+  if (!o || typeof o !== "object") return null;
+  for (var k in o) if (isTiles(o[k])) return o[k];
+  return null;
+}
+function pickTable(o, re) {
+  if (!o || typeof o !== "object") return null;
+  for (var k in o) if (re.test(k) && isTable(o[k])) return o[k];
+  return null;
+}
+function pickText(o, keys) {
+  var out = [];
+  keys.forEach(function (k) { var v = o && o[k]; if (typeof v === "string") out.push(v); else if (Array.isArray(v)) v.forEach(function (x) { if (typeof x === "string") out.push(x); }); });
+  return out;
+}
+function moneyOf(s) { var n = parseFloat(String(s || "").replace(/[^0-9.\-]/g, "")); return isNaN(n) ? 0 : n; }
+function isGeneric(p) { return !!(p && (pickTiles(p) || pickTable(p, /market|health/i))); }
 function findRow(tbl, re) {
   if (!tbl || !tbl.rows) return null;
   for (var i = 0; i < tbl.rows.length; i++) if (re.test(String(tbl.rows[i][0]))) return tbl.rows[i];
@@ -616,9 +647,10 @@ function findRow(tbl, re) {
 function todayTiles() {
   var m = MKT.mtd || {};
   if (isGeneric(m)) {
-    var t0 = (m.tiles || [])[0] || {};
-    var bb = findRow(m.trading_health, /^buy box/i);
-    var th = (m.trading_health && m.trading_health.head) || [];
+    var t0 = (pickTiles(m) || [])[0] || {};
+    var ht = pickTable(m, /health/i);
+    var bb = findRow(ht, /^buy box/i);
+    var th = (ht && ht.head) || [];
     return {
       total: t0.num || "—", totalLbl: t0.label || "Sell-out, month to date",
       bb: bb ? bb[1] : "—",
@@ -649,19 +681,23 @@ function tileCards(tiles, hotRe) {
       + '<div class="fval num">' + esc(x.num) + '</div>' + clampP(x.delta) + '</div>';
   }).join("") + '</div>';
 }
-function mktBars(tb) {
+function mktBars(tb, p) {
   if (!tb || !tb.rows) return "";
   var rows = tb.rows.filter(function (r) { return !/^total$/i.test(String(r[0])); });
-  var shares = rows.map(function (r) { return parseFloat(String(r[3] || "").replace(/[^0-9.]/g, "")) || 0; });
+  var sum = rows.reduce(function (a, r) { return a + moneyOf(r[1]); }, 0) || 1;
+  var shares = rows.map(function (r) {
+    var s = parseFloat(String(r[3] || "").replace(/[^0-9.]/g, ""));
+    return isNaN(s) ? moneyOf(r[1]) / sum * 100 : s;
+  });
   var max = Math.max.apply(null, shares.concat([1]));
-  var tot = findRow(tb, /^total$/i);
+  var tot = findRow(tb, /^total$/i) || (p && p.total ? ["Total", p.total, p.total_units || ""] : null);
   var head = tb.head || [];
   return '<div class="bigcard"><div class="eyebrow">' + esc((head[0] || "Marketplace") + " · " + (head[1] || "")) + '</div>'
     + (tot ? '<div class="bigval num">' + esc(tot[1]) + '</div><div class="note" style="margin-top:6px">' + esc(tot[2] ? tot[2] + " units" : "") + '</div>' : "")
     + '<div class="bars">' + rows.map(function (r, i) {
         var col = /amazon us/i.test(r[0]) ? "var(--fg)" : /walmart/i.test(r[0]) ? "var(--lilac)" : "var(--blue)";
         return '<div class="barrow"><div class="barhead"><span>' + esc(r[0]) + '</span><span class="num"><b style="font-weight:500">' + esc(r[1]) + '</b>'
-          + (r[2] ? ' <span class="barsub">' + esc(r[2]) + ' units · ' + esc(r[3] || "") + '</span>' : "") + '</span></div>'
+          + (r[2] ? ' <span class="barsub">' + esc(r[2]) + ' units · ' + (r[3] ? esc(r[3]) : shares[i].toFixed(1) + "%") + '</span>' : "") + '</span></div>'
           + '<div class="bartrack"><span class="barfill" style="width:' + Math.max(1.5, shares[i] / max * 100) + '%;background:' + col + '"></span></div></div>';
       }).join("") + '</div></div>';
 }
@@ -678,10 +714,10 @@ function healthCard(tb) {
       }).join("") + '</div></div>';
 }
 function ecomCard(E) {
-  if (!E || !(E.tiles || E.table)) return "";
-  var notes = Array.isArray(E.note) ? E.note : (E.note ? [E.note] : []);
+  if (!E || !(pickTiles(E) || pickTable(E, /./))) return "";
+  var notes = pickText(E, ["note", "notes"]);
   return '<div class="bigcard"><div class="eyebrow">E-commerce and channels · ' + esc(E.period || "") + '</div>'
-    + tileCards(E.tiles) + tableHTML(E.table)
+    + tileCards(pickTiles(E)) + tableHTML(pickTable(E, /./))
     + (E.caveat ? '<p class="note" style="color:var(--accent)">' + esc(E.caveat) + '</p>' : "")
     + notes.map(function (n) { return clampP(n); }).join("")
     + (E.source ? '<p class="note">Source: ' + esc(E.source) + '</p>' : "") + '</div>';
@@ -696,22 +732,22 @@ function viewNumbers() {
   }
   if (!isGeneric(p)) return viewNumbersLegacy(p);
   var lbl = function (k, d) { var x = MKT[k]; return esc((x && x.label) || d); };
-  var h = '<h1 class="view">Numbers</h1><p class="sub-line">' + esc(MKT.source || "Marketplace sell-out from Pattern Intelligence") + (MKT.read_at && !isNaN(Date.parse(MKT.read_at)) ? ' · read ' + esc(fmtWhen(new Date(MKT.read_at))) : "") + '</p>'
+  var h = '<h1 class="view">Numbers</h1><p class="sub-line">' + esc(MKT.source || "Pattern Intelligence") + (MKT.read_at && !isNaN(Date.parse(MKT.read_at)) ? ' · read ' + esc(fmtWhen(new Date(MKT.read_at))) : "") + '</p>'
     + '<div class="chips">'
     + '<button type="button" class="chip" data-period="mtd" aria-pressed="' + (state.period === "mtd") + '">' + lbl("mtd", "This month") + '</button>'
     + '<button type="button" class="chip" data-period="last" aria-pressed="' + (state.period === "last") + '">' + lbl("last", "Last month") + '</button>'
     + '<button type="button" class="chip" data-period="fytd" aria-pressed="' + (state.period === "fytd") + '">' + lbl("fytd", "FY27") + '</button>'
     + '</div>';
-  h += tileCards(p.tiles, /lost|buy.?box/i);
-  h += '<div class="numgrid"><div>' + mktBars(p.marketplaces) + '</div><div>' + healthCard(p.trading_health) + '</div></div>';
-  if (p.note) h += clampP(p.note);
+  h += tileCards(pickTiles(p), /lost|buy.?box/i);
+  h += '<div class="numgrid"><div>' + mktBars(pickTable(p, /market/i), p) + '</div><div>' + healthCard(pickTable(p, /health/i)) + '</div></div>';
+  pickText(p, ["note", "notes"]).forEach(function (n) { h += clampP(n); });
   var pur = MKT.purchases;
   if (pur && pur.tables && pur.tables.length) {
     h += '<h2 class="sec">Pattern purchases</h2><div class="bigcard" style="margin-top:0">'
       + pur.tables.map(function (tb) { return tableHTML(tb); }).join("")
-      + (Array.isArray(pur.notes) ? pur.notes : pur.notes ? [pur.notes] : []).map(function (n) { return clampP(n); }).join("") + '</div>';
+      + pickText(pur, ["notes", "note", "what_it_says", "how_measured"]).map(function (n) { return clampP(n); }).join("") + '</div>';
   }
-  if (ECOM && (ECOM.tiles || ECOM.table)) h += '<h2 class="sec">E-commerce</h2>' + ecomCard(ECOM).replace('class="bigcard"', 'class="bigcard" style="margin-top:0"');
+  if (ECOM && (pickTiles(ECOM) || pickTable(ECOM, /./))) h += '<h2 class="sec">E-commerce</h2>' + ecomCard(ECOM).replace('class="bigcard"', 'class="bigcard" style="margin-top:0"');
   else if (ECOM && ECOM.val) h += '<div class="bigcard"><div class="eyebrow">E-commerce (DTC) · ' + esc(ECOM.month) + '</div><div class="fval num">' + esc(ECOM.val) + '</div><p class="note">' + esc(ECOM.vs || "") + '</p></div>';
   return h;
 }
@@ -1043,6 +1079,7 @@ document.addEventListener("click", function (ev) {
     var next = themes[(themes.indexOf(cur2) + 1) % themes.length];
     if (next) document.documentElement.setAttribute("data-theme", next);
     else document.documentElement.removeAttribute("data-theme");
+    state.theme = next; save();
     var tv2 = document.getElementById("themeval");
     if (tv2) tv2.textContent = themeLabel();
     return;
