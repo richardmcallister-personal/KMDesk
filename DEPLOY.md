@@ -157,3 +157,15 @@ public/service-worker.js       precache + offline, cache km-desk-v9
 public/manifest.webmanifest    installable, standalone, shortcuts
 public/fonts /img /icons       Murphy Sans, wordmarks, app tiles
 ```
+
+## 6. Systems tab (scheduled tasks + API health)
+
+A second document, independent of the desk: KV key `systems.json`, served at
+`/data/systems.json` behind Access, written with
+`PUT https://km-ingest.richardmcallister.app/systems` and the same
+`DESK_WRITE_KEY`. Body: `{"built": ISO, "tasks": [...], "health": {...}}` —
+at least one of `tasks` (list) or `health` (object). A systems write can never
+touch the desk. The "KMDesk systems sync" Claude scheduled task writes it every
+three hours, 07–22 Stockholm, from the scheduled-task list and the Deputy CEO
+Desk's `health/latest` document (written daily at 06.45 by "API health check").
+The tab is read-only; Run now, Pause and approvals stay on the full desk.

@@ -2,9 +2,10 @@
    Cache-first for the shell so the app opens on a plane. Bump CACHE on every
    deploy: the old cache is deleted on activate and clients reload once. */
 
-var CACHE = "km-desk-v9";
+var CACHE = "km-desk-v10";
 
 var DESK = "./data/desk.json";
+var SYS = "./data/systems.json";
 
 var SHELL = [
   "./",
@@ -76,6 +77,19 @@ self.addEventListener("fetch", function (e) {
           if (hit) return hit;
           throw new Error("offline and no saved copy of the desk");
         });
+      })
+    );
+    return;
+  }
+
+  // Scheduled tasks and API health: same rule as the desk.
+  if (url.pathname.endsWith("/data/systems.json")) {
+    e.respondWith(
+      fetch(req).then(function (res) {
+        if (res && res.ok) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(SYS, copy); }); return res; }
+        return caches.match(SYS).then(function (hit) { return hit || res; });
+      }).catch(function () {
+        return caches.match(SYS).then(function (hit) { if (hit) return hit; throw new Error("offline and no saved copy of systems"); });
       })
     );
     return;

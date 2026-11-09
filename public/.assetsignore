@@ -1,2 +1,3 @@
 # Served from KV by src/worker.js, never as a static asset
 data/desk.json
+data/systems.json

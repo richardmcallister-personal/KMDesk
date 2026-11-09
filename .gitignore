@@ -5,3 +5,4 @@ node_modules/
 
 # the desk itself - never committed
 public/data/desk.json
+public/data/systems.json

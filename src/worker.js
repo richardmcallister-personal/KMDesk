@@ -12,6 +12,11 @@ const DESK_KEY = "desk.json";
 const INGEST_PATH = "/desk";
 const MAX_BYTES = 5 * 1024 * 1024;
 const REQUIRED = ["owe", "owed", "prj", "dec"];
+// Systems view (scheduled tasks + API health): a second, independent document,
+// so a systems write can never touch the desk and the other way round.
+const SYS_PATH = "/data/systems.json";
+const SYS_KEY = "systems.json";
+const SYS_INGEST_PATH = "/systems";
 
 export default {
   async fetch(request, env) {
@@ -19,6 +24,19 @@ export default {
 
     if (env.INGEST_HOST && url.hostname === env.INGEST_HOST) {
       return ingest(request, env, url);
+    }
+
+    if (url.pathname === SYS_PATH) {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
+      }
+      const sys = await env.DESK.get(SYS_KEY, { type: "stream" });
+      if (!sys) {
+        return Response.json({ error: "Systems have not been written yet." }, { status: 404, headers: { "Cache-Control": "no-store" } });
+      }
+      return new Response(request.method === "HEAD" ? null : sys, {
+        headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" },
+      });
     }
 
     if (url.pathname === DESK_PATH) {
@@ -50,11 +68,12 @@ export default {
 
 async function ingest(request, env, url) {
   const notFound = () => new Response("Not found", { status: 404 });
-  if (url.pathname !== INGEST_PATH) return notFound();
+  if (url.pathname !== INGEST_PATH && url.pathname !== SYS_INGEST_PATH) return notFound();
   if (request.method !== "PUT") return notFound();
   if (!env.DESK_WRITE_KEY || !(await keyMatches(request.headers.get("Authorization"), env.DESK_WRITE_KEY))) {
     return new Response("Unauthorized", { status: 401 });
   }
+  if (url.pathname === SYS_INGEST_PATH) return ingestSystems(request, env);
 
   const body = await request.text();
   if (body.length > MAX_BYTES) return reply(413, "desk.json is over 5 MB");
@@ -72,6 +91,21 @@ async function ingest(request, env, url) {
     counts: Object.fromEntries(REQUIRED.map((k) => [k, desk[k].length])),
     warnings: shapeWarnings(desk),
   });
+}
+
+// PUT /systems: {built, tasks: [...], health: {...}}. Either part may be
+// missing on a given run, but at least one must be there.
+async function ingestSystems(request, env) {
+  const body = await request.text();
+  if (body.length > MAX_BYTES) return reply(413, "systems.json is over 5 MB");
+  let sys;
+  try { sys = JSON.parse(body); } catch { return reply(400, "Body is not valid JSON"); }
+  if (!sys || typeof sys !== "object" || Array.isArray(sys)) return reply(400, "Body must be a JSON object");
+  const hasTasks = Array.isArray(sys.tasks), hasHealth = !!sys.health && typeof sys.health === "object";
+  if (!hasTasks && !hasHealth) return reply(400, "Needs a \"tasks\" list or a \"health\" object");
+  const written = new Date().toISOString();
+  await env.DESK.put(SYS_KEY, body, { metadata: { written } });
+  return Response.json({ ok: true, written, counts: { tasks: hasTasks ? sys.tasks.length : null, health: hasHealth } });
 }
 
 // The app's field names (see public/data/desk.sample.json). Anything missing

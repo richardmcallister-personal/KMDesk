@@ -445,7 +445,7 @@ var DATA = { owe: [], owed: [], prj: [], dec: [] };
 var LOADED = false;
 var LOAD_ERR = null;
 
-var APP_VERSION = "km-desk-v9";  /* keep in step with CACHE in service-worker.js */
+var APP_VERSION = "km-desk-v10";  /* keep in step with CACHE in service-worker.js */
 var BUILT = null;     /* when the rebuild wrote desk.json */
 var FETCHED = null;   /* when this app last read it */
 var DESK_URL = "https://claude.ai/code/artifact/fb499e12-349a-4da5-8b82-e6046d23d692";
@@ -455,6 +455,9 @@ var DESK_URL = "https://claude.ai/code/artifact/fb499e12-349a-4da5-8b82-e6046d23
 var MKT = {};
 
 var ECOM = {};
+
+/* Scheduled tasks and API health, from data/systems.json (separate from the desk). */
+var SYS = null, SYS_ERR = null;
 
 /* ---------- local-only state (this browser) ---------- */
 var LS = "kmdesk-mobile-v1";
@@ -502,6 +505,7 @@ var IC = {
   owe: '<path d="m4 12 4 4 10-10"/><path d="M4 19h16"/>',
   num: '<path d="M5 20V11"/><path d="M12 20V5"/><path d="M19 20v-6"/>',
   work: '<path d="M3 7h18v13H3z"/><path d="M9 7V4h6v3"/>',
+  sys: '<path d="M12 3v3"/><path d="M12 18v3"/><path d="M3 12h3"/><path d="M18 12h3"/><circle cx="12" cy="12" r="5"/>',
   more: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
   chev: '<path d="m9 18 6-6-6-6"/>',
@@ -829,7 +833,78 @@ function viewMore() {
   return h;
 }
 
-var VIEWS = { today: viewToday, owe: viewOwe, num: viewNumbers, work: viewWork, more: viewMore };
+/* ---------- systems: scheduled tasks + API health ---------- */
+var SYS_LBL = { bad: "Down", warn: "Slow / stale", ok: "OK", skip: "Not checked" };
+var TASK_LBL = { attn: "Needs you", asks: "Asks before acting", ok: "Running fine", off: "Paused or ended" };
+function sysPill(s) {
+  var cls = s === "bad" || s === "attn" ? " warn" : s === "ok" ? " new" : "";
+  return '<span class="pill' + cls + '">' + esc(SYS_LBL[s] || TASK_LBL[s] || s || "") + '</span>';
+}
+function sysWhen(iso) { var d = iso && !isNaN(Date.parse(iso)) ? new Date(iso) : null; return d ? fmtWhen(d) : ""; }
+function sysRow(title, sub, right, pill, href) {
+  var inner = '<span class="rowtext"><span class="rowwho">' + esc(title) + '</span>' + (sub ? '<span class="rowsub">' + esc(sub) + '</span>' : '') + '</span>'
+    + (right ? '<span class="age num">' + esc(right) + '</span>' : '') + pill;
+  return href
+    ? '<a class="linkrow" style="min-height:60px" href="' + esc(href) + '" target="_blank" rel="noopener">' + inner + '</a>'
+    : '<div class="linkrow" style="min-height:60px">' + inner + '</div>';
+}
+function sysCounts() {
+  var h = SYS && SYS.health, t = (SYS && SYS.tasks) || [];
+  var bad = 0;
+  if (h) [].concat(h.sites || [], h.apis || [], h.actions || [], h.connectors || []).forEach(function (x) { if (x.status === "bad") bad++; });
+  var attn = t.filter(function (x) { return x.bucket === "attn"; }).length;
+  return { bad: bad, attn: attn, total: bad + attn };
+}
+function viewSystems() {
+  var h = '<h1 class="view">Systems</h1><p class="sub-line">'
+    + (SYS ? esc("Snapshot " + (sysWhen(SYS.built) || "time not recorded")) : (SYS_ERR ? esc(SYS_ERR) : "Reading\u2026")) + '</p>';
+  if (!SYS) return h + '<div class="empty"><div class="big">' + (SYS_ERR ? "No systems snapshot yet" : "Reading\u2026") + '</div><p>The "KMDesk systems sync" scheduled task writes this every three hours, 07\u201322. Run now, Pause and approvals stay on the full desk.</p></div>';
+
+  var t = SYS.tasks || [];
+  h += '<h2 class="sec">Scheduled tasks</h2>';
+  if (!t.length) h += '<div class="card"><div class="linkrow"><span>No tasks in this snapshot</span></div></div>';
+  ["attn", "asks", "ok", "off"].forEach(function (b) {
+    var l = t.filter(function (x) { return x.bucket === b; });
+    if (!l.length) return;
+    h += '<p class="note" style="margin:12px 0 6px">' + esc(TASK_LBL[b]) + ' \u00b7 ' + l.length + '</p><div class="card">'
+      + l.map(function (x) {
+          var sub = [x.lastLabel, x.lastAt ? sysWhen(x.lastAt) : "", x.schedule].filter(Boolean).join(" \u00b7 ");
+          return sysRow(x.name, sub, x.next ? "Next " + sysWhen(x.next) : "", b === "attn" ? sysPill("attn") : "", x.run);
+        }).join("") + '</div>';
+  });
+
+  var hh = SYS.health;
+  h += '<h2 class="sec">API health</h2>';
+  if (!hh) return h + '<div class="card"><div class="linkrow"><span>No health check in this snapshot</span></div></div>' + sysFoot();
+  h += '<p class="note" style="margin:0 0 10px">Checked ' + esc(hh.label || sysWhen(hh.checkedAt)) + '</p>';
+  if ((hh.changes || []).length) h += '<div class="bigcard" style="margin:0 0 14px"><p class="note" style="margin:0"><b>Changed since the last check</b><br>' + hh.changes.map(esc).join("<br>") + '</p></div>';
+  [["sites", "Sites and Workers", function (x) { return [x.name || x.url, x.note || (x.repo || ""), x.code ? "HTTP " + x.code : "", x.url]; }],
+   ["apis", "External feeds", function (x) { return [x.name || x.host, (x.repos || []).join(", ") + (x.note ? " \u00b7 " + x.note : ""), x.code ? "HTTP " + x.code : "", null]; }],
+   ["actions", "GitHub Actions", function (x) { return [x.workflow, x.repo + (x.conclusion ? " \u00b7 " + x.conclusion : ""), x.at ? sysWhen(x.at) : "", x.url]; }],
+   ["connectors", "Claude connectors", function (x) { return [x.name, x.note || "", x.ms != null ? x.ms + " ms" : "", null]; }]
+  ].forEach(function (g) {
+    var l = (hh[g[0]] || []);
+    if (!l.length) return;
+    var order = { bad: 0, warn: 1, skip: 2, ok: 3 };
+    l = l.slice().sort(function (a, b) { return (order[a.status] || 9) - (order[b.status] || 9); });
+    var bad = l.filter(function (x) { return x.status === "bad"; }).length;
+    h += '<p class="note" style="margin:12px 0 6px">' + esc(g[1]) + ' \u00b7 ' + l.length + (bad ? ' \u00b7 ' + bad + ' down' : '') + '</p><div class="card">'
+      + l.map(function (x) { var v = g[2](x); return sysRow(v[0], v[1], v[2], sysPill(x.status), v[3]); }).join("") + '</div>';
+  });
+  if ((hh.gaps || []).length) h += '<p class="note" style="margin:12px 0 0">Not checked: ' + hh.gaps.map(esc).join("; ") + '</p>';
+  return h + sysFoot();
+}
+function sysFoot() {
+  return '<div class="card" style="margin-top:18px"><a class="linkrow" href="' + DESK_URL + '#tasks" target="_blank" rel="noopener"><span>Run, pause or approve</span><span class="r">Full desk</span></a></div>';
+}
+function loadSystems() {
+  return fetch("./data/systems.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status === 404 ? "Not written yet" : "data/systems.json returned " + r.status); return r.json(); })
+    .then(function (d) { SYS = d; SYS_ERR = null; renderTabs(); if (state.tab === "sys") render(); })
+    .catch(function (e) { SYS_ERR = (e && e.message) || "Could not read systems"; if (state.tab === "sys") render(); });
+}
+
+var VIEWS = { today: viewToday, owe: viewOwe, num: viewNumbers, work: viewWork, sys: viewSystems, more: viewMore };
 
 /* ---------- detail sheet ---------- */
 var sheetFor = null;
@@ -997,6 +1072,7 @@ function renderTabs() {
     ["owe", "Owe", IC.owe, owe ? String(owe) : ""],
     ["num", "Numbers", IC.num, ""],
     ["work", "Work", IC.work, ""],
+    ["sys", "Systems", IC.sys, sysCounts().total ? String(sysCounts().total) : ""],
     ["more", "More", IC.more, ""]
   ];
   document.getElementById("tabs").innerHTML = defs.map(function (d) {
@@ -1086,7 +1162,7 @@ document.addEventListener("click", function (ev) {
   }
   if (el.id === "recheck") {
     el.classList.add("spin");
-    loadDesk(true).then(function () { el.classList.remove("spin"); });
+    loadSystems(); loadDesk(true).then(function () { el.classList.remove("spin"); });
     return;
   }
 });
@@ -1206,10 +1282,11 @@ function nextRebuild() {
   return (h < 6 ? "06.00" : h < 12 ? "12.00" : h < 18 ? "18.00" : "06.00 tomorrow") + " CET";
 }
 loadDesk(false);
+loadSystems();
 
 /* Coming back to the app picks up a newer rebuild without a tap. */
 document.addEventListener("visibilitychange", function () {
-  if (document.visibilityState === "visible" && (!FETCHED || Date.now() - FETCHED.getTime() > 60000)) loadDesk(false);
+  if (document.visibilityState === "visible" && (!FETCHED || Date.now() - FETCHED.getTime() > 60000)) { loadDesk(false); loadSystems(); }
 });
 
 /* Updates install themselves: check for a new service worker whenever the app

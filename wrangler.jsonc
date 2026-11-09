@@ -10,7 +10,7 @@
     "directory": "./public",
     "binding": "ASSETS",
     // The desk is served by the Worker from KV, never as a static file.
-    "run_worker_first": ["/data/desk.json"]
+    "run_worker_first": ["/data/desk.json", "/data/systems.json"]
   },
   "kv_namespaces": [
     { "binding": "DESK", "id": "51657938b0194d538add1a577437db41" }
