@@ -284,6 +284,129 @@ h2.sec { margin: 26px 0 10px; font-size: 12px; font-weight: 500; letter-spacing:
 .empty p { margin: 8px 0 0; font-size: 13px; line-height: 1.55; color: var(--fg-soft); }
 .brand { height: 12px; width: 126px; max-width: 60%; margin-top: 16px; background: var(--logo) left center / contain no-repeat; }
 .stamp { margin-top: 10px; font-size: 12px; color: var(--fg-soft); }
+
+/* ---- generic figures ---- */
+.ftiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 16px; }
+.ftile { background: var(--panel); border: 1px solid var(--rule); border-radius: 16px; padding: 16px 18px; min-width: 0; }
+.ftile.hot { background: var(--accent-tint); border-color: var(--accent-edge); }
+.ftile.hot .eyebrow, .ftile.hot .fval { color: var(--accent); }
+.fval { margin-top: 6px; font-size: 28px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.1; }
+.bigcard .ftiles { margin-top: 12px; }
+.bigcard .ftile { background: transparent; }
+.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+.clamp.open { display: block; -webkit-line-clamp: unset; }
+.barsub { color: var(--fg-soft); font-size: 11.5px; margin-left: 6px; }
+.kpic { font-size: 11px; color: var(--fg-faint); margin-top: 1px; }
+.tablewrap { margin-top: 14px; overflow-x: auto; }
+.dtable { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.dtable th { text-align: right; font-weight: 500; font-size: 11px; letter-spacing: 0.04em; color: var(--fg-soft); padding: 6px 8px; border-bottom: 1px solid var(--rule); }
+.dtable td { text-align: right; padding: 8px; border-bottom: 1px solid var(--rule-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dtable th:first-child, .dtable td:first-child { text-align: left; white-space: normal; padding-left: 0; }
+.dtable tr.tot td { font-weight: 500; border-bottom: 0; }
+
+/* Pieces that only exist on one layout. */
+.desk-only { display: none; }
+.wide-grid > * { min-width: 0; }
+.sheetempty { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; padding: 40px 44px; color: var(--sheet-soft); }
+.sheetempty .big { font-size: 22px; font-weight: 500; letter-spacing: -0.015em; color: var(--sheet-fg); }
+.sheetempty p { margin: 10px 0 0; font-size: 13.5px; line-height: 1.6; max-width: 34ch; }
+.kbd { display: inline-block; min-width: 22px; padding: 1px 6px; border: 1px solid var(--sheet-rule); border-radius: 5px; font-size: 11px; text-align: center; color: var(--sheet-fg); }
+
+/* ---- tablet: same single column, more room ---- */
+@media (min-width: 700px) and (max-width: 1023.98px) {
+  #app { max-width: 720px; }
+  #pane { padding: 28px 28px 32px; }
+}
+
+/* ---- desktop: sidebar, working pane and a reading pane on the right ---- */
+@media (min-width: 1024px) {
+  .desk-only { display: block; }
+  .mob-only { display: none !important; }
+
+  #app {
+    max-width: 1680px;
+    display: grid;
+    grid-template-columns: 212px minmax(0, 1fr) clamp(360px, 30vw, 540px);
+    grid-template-rows: 60px minmax(0, 1fr);
+    grid-template-areas: "head head head" "nav pane sheet";
+    border-left: 1px solid var(--rule); border-right: 1px solid var(--rule);
+  }
+  #apphead { grid-area: head; height: 60px; padding: 0 28px; }
+  #apphead .brand { height: 14px; width: 150px; }
+  #apphead .stamp { font-size: 11px; }
+
+  #tabs {
+    grid-area: nav; flex-direction: column; gap: 2px;
+    padding: 20px 14px; border-top: 0; border-right: 1px solid var(--rule);
+    background: var(--bg); overflow-y: auto;
+  }
+  .tab {
+    flex: 0 0 auto; min-height: 44px; flex-direction: row; justify-content: flex-start;
+    gap: 12px; padding: 0 14px; border-radius: 10px; color: var(--fg-soft);
+  }
+  .tab:hover { background: var(--rule-soft); color: var(--fg); }
+  .tab[aria-current="true"] { background: var(--accent-tint); color: var(--accent); }
+  .tablbl { font-size: 14px; letter-spacing: 0; display: flex; flex: 1 1 auto; justify-content: space-between; }
+  .tabcount { font-size: 12px; font-weight: 500; }
+
+  #pane { grid-area: pane; padding: 36px 44px 48px; }
+  #pane > * { max-width: 1060px; }
+  h1.view { font-size: 34px; }
+  .sub-line { font-size: 13.5px; }
+
+  #sheet {
+    grid-area: sheet; position: static; z-index: auto;
+    border-left: 1px solid var(--sheet-rule);
+    transition: none;
+  }
+  #sheet.enter { transform: none; opacity: 1; }
+  .sheettop { padding: 18px 22px 0; }
+  .sheetbody { padding: 18px 32px 28px; }
+  .sheetwho { font-size: 32px; }
+  .sheettext { font-size: 15px; max-width: 62ch; }
+  .sheetact { padding: 16px 32px 20px; }
+  .bigbtn { min-height: 48px; }
+  .actrow button { min-height: 42px; }
+
+  /* selected row in the list matches what is open on the right */
+  .row.sel, .wrow.sel { background: var(--accent-tint); }
+  .row.sel .rowmain:hover, .wrow.sel:hover { background: transparent; }
+  .row.sel { box-shadow: inset 3px 0 0 var(--accent); }
+  .wrow.sel { box-shadow: inset 3px 0 0 var(--accent); }
+
+  #toast { left: auto; right: calc(clamp(360px, 30vw, 540px) + 24px); bottom: 24px; width: 420px; max-width: calc(100% - 640px); }
+
+  /* today: focus beside the tiles, then what you owe beside what you are owed */
+  .hello h1.view { font-size: 38px; }
+  .todaytop { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: stretch; margin-top: 20px; }
+  .todaytop .focuscard { margin-top: 0; display: flex; flex-direction: column; }
+  .todaytop #focus { flex: 1 1 auto; }
+  .todaytop .tiles { display: contents; }
+  .todaytop .tile { padding: 20px; display: flex; flex-direction: column; justify-content: space-between; }
+  .todaytop .tileval { font-size: 26px; white-space: nowrap; }
+  .rowmain:focus-visible, .wrow:focus-visible { outline-offset: -2px; }
+  .wide-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  .needlist { max-height: none; overflow: visible; }
+  .needlist .rowsub, .owedlist .rowsub { -webkit-line-clamp: 3; }
+
+  /* numbers: marketplaces on the left, trading health and DTC on the right */
+  .numgrid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 4px; }
+  .numgrid .bigcard, .numgrid .hotcard { margin-top: 16px; }
+  .numgrid .bigval { font-size: 44px; }
+
+  /* work: projects and decisions side by side */
+  .workgrid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  .workgrid h2.sec { margin-top: 16px; }
+  .workgrid .card { margin-top: 0 !important; }
+  .wnext { -webkit-line-clamp: 3; }
+
+  .card, .bigcard, .hotcard, .tile, .focuscard { border-radius: 14px; }
+  .rowmain { padding-top: 15px; padding-bottom: 15px; }
+}
+@media (min-width: 1440px) {
+  #app { grid-template-columns: 232px minmax(0, 1fr) clamp(360px, 31vw, 560px); }
+  #pane { padding: 40px 52px 56px; }
+}
 </style>
 </head>
 <body>
@@ -312,7 +435,7 @@ var DATA = { owe: [], owed: [], prj: [], dec: [] };
 var LOADED = false;
 var LOAD_ERR = null;
 
-var APP_VERSION = "km-desk-v7";  /* keep in step with CACHE in service-worker.js */
+var APP_VERSION = "km-desk-v8";  /* keep in step with CACHE in service-worker.js */
 var BUILT = null;     /* when the rebuild wrote desk.json */
 var FETCHED = null;   /* when this app last read it */
 var DESK_URL = "https://claude.ai/code/artifact/fb499e12-349a-4da5-8b82-e6046d23d692";
@@ -381,7 +504,8 @@ function esc(s) {
 function rowHTML(r, kind) {
   var hot = r.hot || days(r.age) > 7;
   var isNew = days(r.age) === 0;
-  return '<div class="row">'
+  var sel = sheetFor && sheetFor.kind === kind && sheetFor.key === r.key;
+  return '<div class="row' + (sel ? ' sel' : '') + '">'
     + '<button type="button" class="tickbtn" data-close="' + esc(kind) + ':' + esc(r.key) + '" aria-label="Close ' + esc(r.who) + '"><span></span></button>'
     + '<button type="button" class="rowmain" data-open="' + esc(kind) + ':' + esc(r.key) + '">'
       + '<span class="rowtext"><span class="rowwho">' + esc(r.who) + '</span>'
@@ -409,22 +533,25 @@ function viewToday() {
     return days(b.age) - days(a.age);
   });
 
-  var mtd = MKT.mtd || {};
+  var tl = todayTiles();
   var h = '<div class="hello"><div>'
     + '<div class="eyebrow">' + esc(new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })) + '</div>'
     + '<h1 class="view">' + greeting() + ', Richard</h1></div>'
     + '<button type="button" class="iconbtn" id="recheck" aria-label="Reload the desk">' + svg(IC.refresh) + '</button></div>'
     + '<div class="stamp">' + esc(stampLine()) + '</div>';
 
+  h += '<div class="todaytop">';
   h += '<div class="focuscard"><div class="focushead"><span class="dot"></span><span class="eyebrow">Focus</span></div>'
     + '<label class="sr" for="focus">Focus for today</label>'
     + '<textarea id="focus" rows="2" placeholder="What actually has to happen today…">' + esc(state.focus) + '</textarea></div>';
 
   h += '<div class="tiles">'
-    + '<div class="tile"><div class="tileval num">' + (mtd.total || '\u2014') + '</div><div class="tilelbl"><b class="tilescope">All marketplaces</b>Sell-out, Oct to date</div></div>'
-    + '<div class="tile hot"><div class="tileval num">' + (mtd.buyboxShort || '\u2014') + '</div><div class="tilelbl"><b class="tilescope">Amazon US</b>' + esc(mtd.buyboxDelta || 'Buy box') + '</div></div>'
+    + '<div class="tile"><div class="tileval num">' + esc(tl.total) + '</div><div class="tilelbl"><b class="tilescope">All marketplaces</b>' + esc(tl.totalLbl) + '</div></div>'
+    + '<div class="tile hot"><div class="tileval num">' + esc(tl.bb) + '</div><div class="tilelbl"><b class="tilescope">Amazon US</b>' + esc(tl.bbLbl) + '</div></div>'
     + '</div>';
+  h += '</div>';
 
+  h += '<div class="wide-grid"><section>';
   h += '<h2 class="sec">Needs you first</h2>';
   if (!LOADED) {
     h += loadingCard();
@@ -432,9 +559,21 @@ function viewToday() {
     h += '<div class="empty"><div class="big">Nothing owed by you</div><p>Every commitment on the desk is closed. New mail lands at the next rebuild — 06.00, 12.00 and 18.00 Copenhagen time.</p></div>';
   } else {
     h += '<div class="card needlist" tabindex="0" aria-label="Everything you owe, scrollable">' + top.map(function (r) { return rowHTML(r, "owe"); }).join("") + '</div>';
-    if (top.length > 3) h += '<p class="note scrollhint">Scroll the list for all ' + top.length + ' \u00b7 tap any item for the full detail</p>';
+    if (top.length > 3) h += '<p class="note scrollhint mob-only">Scroll the list for all ' + top.length + ' \u00b7 tap any item for the full detail</p>';
     h += '<p class="note">' + owe.length + ' owed by you, ' + hot.length + ' of them over a week. ' + owed.length + ' owed to you.</p>';
   }
+  h += '</section>';
+
+  /* Desktop has room for the other side of the ledger. */
+  if (LOADED && !LOAD_ERR) {
+    var owedSorted = owed.slice().sort(function (a, b) { return days(b.age) - days(a.age); });
+    h += '<section class="desk-only"><h2 class="sec">Owed to you</h2>'
+      + (owedSorted.length
+          ? '<div class="card owedlist">' + owedSorted.map(function (r) { return rowHTML(r, "owed"); }).join("") + '</div>'
+          : '<div class="empty" style="margin-top:0"><div class="big">Nobody owes you</div><p>Nothing outstanding from anyone else.</p></div>')
+      + '</section>';
+  }
+  h += '</div>';
   return h;
 }
 
@@ -460,8 +599,92 @@ function viewOwe() {
   } else {
     h += '<div class="card" style="margin-top:16px">' + list.map(function (r) { return rowHTML(r, isOwe ? "owe" : "owed"); }).join("") + '</div>';
   }
-  h += '<p class="note">Closing here stays on this phone. It does not touch the shared register on the desk yet.</p>';
+  h += '<p class="note">Closing here stays on this device. It does not touch the shared register on the desk yet.</p>';
   return h;
+}
+
+/* ---------- figures ----------
+   The rebuild sends each period as tiles {num, label, delta} and tables
+   {head, rows}. Render whatever arrives; the original fixed shape is kept as a
+   fallback so an older desk.json still reads. */
+function isGeneric(p) { return !!(p && (p.tiles || p.marketplaces || p.trading_health)); }
+function findRow(tbl, re) {
+  if (!tbl || !tbl.rows) return null;
+  for (var i = 0; i < tbl.rows.length; i++) if (re.test(String(tbl.rows[i][0]))) return tbl.rows[i];
+  return null;
+}
+function todayTiles() {
+  var m = MKT.mtd || {};
+  if (isGeneric(m)) {
+    var t0 = (m.tiles || [])[0] || {};
+    var bb = findRow(m.trading_health, /^buy box/i);
+    var th = (m.trading_health && m.trading_health.head) || [];
+    return {
+      total: t0.num || "—", totalLbl: t0.label || "Sell-out, month to date",
+      bb: bb ? bb[1] : "—",
+      bbLbl: bb ? "Buy box" + (bb[2] ? ", " + bb[2] + " in " + (th[2] || "the prior period") : "") : "Buy box"
+    };
+  }
+  return { total: m.total || "—", totalLbl: "Sell-out, month to date", bb: m.buyboxShort || "—", bbLbl: m.buyboxDelta || "Buy box" };
+}
+function clampP(text, cls) {
+  if (!text) return "";
+  return '<p class="note clamp' + (cls ? " " + cls : "") + '" title="Click to expand">' + esc(text) + '</p>';
+}
+function tableHTML(tb, cls) {
+  if (!tb || !tb.rows || !tb.rows.length) return "";
+  var head = tb.head || [];
+  return '<div class="tablewrap"><table class="dtable' + (cls ? " " + cls : "") + '">'
+    + (head.length ? '<thead><tr>' + head.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join("") + '</tr></thead>' : "")
+    + '<tbody>' + tb.rows.map(function (r) {
+        var tot = /^total$/i.test(String(r[0]));
+        return '<tr' + (tot ? ' class="tot"' : "") + '>' + r.map(function (c) { return '<td>' + esc(c) + '</td>'; }).join("") + '</tr>';
+      }).join("") + '</tbody></table></div>';
+}
+function tileCards(tiles, hotRe) {
+  if (!tiles || !tiles.length) return "";
+  return '<div class="ftiles">' + tiles.map(function (x) {
+    var hot = hotRe && hotRe.test(x.label || "");
+    return '<div class="ftile' + (hot ? " hot" : "") + '"><div class="eyebrow">' + esc(x.label) + '</div>'
+      + '<div class="fval num">' + esc(x.num) + '</div>' + clampP(x.delta) + '</div>';
+  }).join("") + '</div>';
+}
+function mktBars(tb) {
+  if (!tb || !tb.rows) return "";
+  var rows = tb.rows.filter(function (r) { return !/^total$/i.test(String(r[0])); });
+  var shares = rows.map(function (r) { return parseFloat(String(r[3] || "").replace(/[^0-9.]/g, "")) || 0; });
+  var max = Math.max.apply(null, shares.concat([1]));
+  var tot = findRow(tb, /^total$/i);
+  var head = tb.head || [];
+  return '<div class="bigcard"><div class="eyebrow">' + esc((head[0] || "Marketplace") + " · " + (head[1] || "")) + '</div>'
+    + (tot ? '<div class="bigval num">' + esc(tot[1]) + '</div><div class="note" style="margin-top:6px">' + esc(tot[2] ? tot[2] + " units" : "") + '</div>' : "")
+    + '<div class="bars">' + rows.map(function (r, i) {
+        var col = /amazon us/i.test(r[0]) ? "var(--fg)" : /walmart/i.test(r[0]) ? "var(--lilac)" : "var(--blue)";
+        return '<div class="barrow"><div class="barhead"><span>' + esc(r[0]) + '</span><span class="num"><b style="font-weight:500">' + esc(r[1]) + '</b>'
+          + (r[2] ? ' <span class="barsub">' + esc(r[2]) + ' units · ' + esc(r[3] || "") + '</span>' : "") + '</span></div>'
+          + '<div class="bartrack"><span class="barfill" style="width:' + Math.max(1.5, shares[i] / max * 100) + '%;background:' + col + '"></span></div></div>';
+      }).join("") + '</div></div>';
+}
+function healthCard(tb) {
+  if (!tb || !tb.rows) return "";
+  var head = tb.head || [];
+  return '<div class="hotcard"><div class="eyebrow" style="color:var(--accent)">' + esc(head[0] || "Trading health") + ' · ' + esc(head[1] || "") + '</div>'
+    + '<div class="grid2">' + tb.rows.map(function (r) {
+        var hot = /buy box|lost/i.test(r[0]);
+        var lbl = String(r[0]).split(",")[0];
+        return '<div><div class="kpi num"' + (hot ? ' style="color:var(--accent)"' : "") + '>' + esc(r[1]) + '</div>'
+          + '<div class="kpil"' + (hot ? ' style="color:var(--accent)"' : "") + '>' + esc(lbl) + '</div>'
+          + (r[2] ? '<div class="kpic">' + esc((head[2] || "Before") + ": " + r[2]) + '</div>' : "") + '</div>';
+      }).join("") + '</div></div>';
+}
+function ecomCard(E) {
+  if (!E || !(E.tiles || E.table)) return "";
+  var notes = Array.isArray(E.note) ? E.note : (E.note ? [E.note] : []);
+  return '<div class="bigcard"><div class="eyebrow">E-commerce and channels · ' + esc(E.period || "") + '</div>'
+    + tileCards(E.tiles) + tableHTML(E.table)
+    + (E.caveat ? '<p class="note" style="color:var(--accent)">' + esc(E.caveat) + '</p>' : "")
+    + notes.map(function (n) { return clampP(n); }).join("")
+    + (E.source ? '<p class="note">Source: ' + esc(E.source) + '</p>' : "") + '</div>';
 }
 
 function viewNumbers() {
@@ -471,6 +694,29 @@ function viewNumbers() {
     return '<h1 class="view">Numbers</h1><div class="empty"><div class="big">No figures in this rebuild</div>'
       + '<p>The last rebuild did not include the marketplace or e-commerce numbers. They come back when the rebuild sends them again.</p></div>';
   }
+  if (!isGeneric(p)) return viewNumbersLegacy(p);
+  var lbl = function (k, d) { var x = MKT[k]; return esc((x && x.label) || d); };
+  var h = '<h1 class="view">Numbers</h1><p class="sub-line">' + esc(MKT.source || "Marketplace sell-out from Pattern Intelligence") + (MKT.read_at && !isNaN(Date.parse(MKT.read_at)) ? ' · read ' + esc(fmtWhen(new Date(MKT.read_at))) : "") + '</p>'
+    + '<div class="chips">'
+    + '<button type="button" class="chip" data-period="mtd" aria-pressed="' + (state.period === "mtd") + '">' + lbl("mtd", "This month") + '</button>'
+    + '<button type="button" class="chip" data-period="last" aria-pressed="' + (state.period === "last") + '">' + lbl("last", "Last month") + '</button>'
+    + '<button type="button" class="chip" data-period="fytd" aria-pressed="' + (state.period === "fytd") + '">' + lbl("fytd", "FY27") + '</button>'
+    + '</div>';
+  h += tileCards(p.tiles, /lost|buy.?box/i);
+  h += '<div class="numgrid"><div>' + mktBars(p.marketplaces) + '</div><div>' + healthCard(p.trading_health) + '</div></div>';
+  if (p.note) h += clampP(p.note);
+  var pur = MKT.purchases;
+  if (pur && pur.tables && pur.tables.length) {
+    h += '<h2 class="sec">Pattern purchases</h2><div class="bigcard" style="margin-top:0">'
+      + pur.tables.map(function (tb) { return tableHTML(tb); }).join("")
+      + (Array.isArray(pur.notes) ? pur.notes : pur.notes ? [pur.notes] : []).map(function (n) { return clampP(n); }).join("") + '</div>';
+  }
+  if (ECOM && (ECOM.tiles || ECOM.table)) h += '<h2 class="sec">E-commerce</h2>' + ecomCard(ECOM).replace('class="bigcard"', 'class="bigcard" style="margin-top:0"');
+  else if (ECOM && ECOM.val) h += '<div class="bigcard"><div class="eyebrow">E-commerce (DTC) · ' + esc(ECOM.month) + '</div><div class="fval num">' + esc(ECOM.val) + '</div><p class="note">' + esc(ECOM.vs || "") + '</p></div>';
+  return h;
+}
+
+function viewNumbersLegacy(p) {
   var h = '<h1 class="view">Numbers</h1><p class="sub-line">Two separate channels · marketplace sell-out from Pattern Intelligence, e-commerce (DTC) from the month-end recap</p>'
     + '<div class="chips">'
     + '<button type="button" class="chip" data-period="mtd" aria-pressed="' + (state.period === "mtd") + '">This month</button>'
@@ -478,6 +724,7 @@ function viewNumbers() {
     + '<button type="button" class="chip" data-period="fytd" aria-pressed="' + (state.period === "fytd") + '">FY27</button>'
     + '</div>';
 
+  h += '<div class="numgrid"><div>';
   h += '<div class="bigcard"><div class="eyebrow">All marketplaces · sell-out, ' + esc(p.label) + '</div>'
     + '<div class="bigval num">' + p.total + '</div>'
     + '<div class="note" style="margin-top:6px">' + esc(p.span) + ' · ' + esc(p.units) + ' · Amazon US, AU, DE, FR and Walmart US combined</div>'
@@ -488,6 +735,7 @@ function viewNumbers() {
           + '<div class="bartrack"><span class="barfill" style="width:' + r[3] + '%;background:' + col + '"></span></div></div>';
       }).join("")
     + '</div></div>';
+  h += '</div><div>';
 
   h += '<div class="hotcard"><div class="eyebrow" style="color:var(--accent)">Amazon US only · trading health</div>'
     + '<div class="grid2">'
@@ -502,6 +750,7 @@ function viewNumbers() {
     + '<span style="font-size:28px;font-weight:500;letter-spacing:-0.02em" class="num">' + ECOM.val + '</span>'
     + '<span style="font-size:13px;color:var(--accent)">' + esc(ECOM.vs) + '</span></div>'
     + '<p class="note">' + esc(ECOM.q) + '</p></div>';
+  h += '</div></div>';
 
   h += '<p class="note">USD, VAT-adjusted, Pattern line of business. Pi’s clock read 4 October at the rebuild, so this month and FY27 to date are a day short. Sell-out is consumer sales and does not reconcile to the marketplace line in e-commerce. Pattern purchases could not be refreshed — the purchase-order service returned HTTP 502 again.</p>';
   return h;
@@ -511,18 +760,19 @@ function viewWork() {
   var prj = live(DATA.prj);
   var h = '<h1 class="view">Work</h1><p class="sub-line">' + prj.length + ' projects · ' + DATA.dec.length + ' decisions logged</p>';
   if (!LOADED) return h + loadingCard();
+  h += '<div class="workgrid"><section><h2 class="sec desk-only">Projects</h2>';
   h += '<div class="card" style="margin-top:16px">' + prj.map(function (r) {
     var meta = r.owner === "Unassigned" ? '<span class="pill warn">Unassigned</span>' : '<span class="wmeta">' + esc(r.owner) + (r.when ? " · " + esc(r.when) : "") + '</span>';
-    return '<button type="button" class="wrow" data-open="prj:' + esc(r.key) + '">'
+    return '<button type="button" class="wrow' + (sheetFor && sheetFor.key === r.key ? ' sel' : '') + '" data-open="prj:' + esc(r.key) + '">'
       + '<span class="whead"><span class="wname">' + esc(r.name) + '</span>' + meta + '</span>'
       + '<span class="wnext">' + esc(r.next) + '</span></button>';
-  }).join("") + '</div>';
+  }).join("") + '</div></section>';
 
-  h += '<h2 class="sec">Decisions</h2><div class="card">' + DATA.dec.map(function (d) {
-    return '<button type="button" class="wrow" data-open="dec:' + esc(d.key) + '">'
+  h += '<section><h2 class="sec">Decisions</h2><div class="card">' + DATA.dec.map(function (d) {
+    return '<button type="button" class="wrow' + (sheetFor && sheetFor.key === d.key ? ' sel' : '') + '" data-open="dec:' + esc(d.key) + '">'
       + '<span class="eyebrow">' + esc(d.date) + '</span>'
       + '<span class="wnext" style="color:var(--fg);font-size:13.5px;margin-top:5px">' + esc(d.what) + '</span></button>';
-  }).join("") + '</div>';
+  }).join("") + '</div></section></div>';
   return h;
 }
 
@@ -569,6 +819,11 @@ function openSheet(kind, key) {
   if (kind === "owe" || kind === "owed") {
     var list = kind === "owe" ? oweLive() : owedLive();
     list = list.slice().sort(function (a, b) { return days(b.age) - days(a.age); });
+    /* Count in the order the list on screen shows, when the item is on it. */
+    var shown = Array.prototype.map.call(document.querySelectorAll('#pane [data-open^="' + kind + ':"]'), function (el) {
+      return find(kind, el.getAttribute("data-open").slice(kind.length + 1));
+    }).filter(Boolean);
+    if (shown.some(function (x) { return x.key === key; })) list = shown;
     var idx = -1;
     for (var i = 0; i < list.length; i++) if (list[i].key === key) idx = i;
     h += '<span class="sheetpos">' + (idx + 1) + ' of ' + list.length + '</span></div>';
@@ -618,18 +873,62 @@ function openSheet(kind, key) {
 
   sheet.innerHTML = h;
   sheet.hidden = false;
+  sheet.scrollTop = 0;
+  markSel();
+  if (DESK.matches) return;
   sheet.classList.add("enter");
   requestAnimationFrame(function () { sheet.classList.remove("enter"); });
   var back = document.getElementById("sheetback");
   if (back) back.focus();
 }
 
+/* Desktop keeps the sheet on screen as a reading pane; it is never hidden. */
+var DESK = window.matchMedia("(min-width: 1024px)");
+function sheetEmpty() {
+  return '<div class="sheetempty"><div class="eyebrow" style="color:var(--sheet-soft)">Reading pane</div>'
+    + '<div class="big" style="margin-top:10px">Pick anything on the left</div>'
+    + '<p>The whole thread, the Outlook link and the actions open here, and the list stays where it is.</p>'
+    + '<p><span class="kbd">J</span> next &nbsp; <span class="kbd">K</span> previous &nbsp; <span class="kbd">Esc</span> clear</p></div>';
+}
+function markSel() {
+  var cur = sheetFor ? sheetFor.kind + ":" + sheetFor.key : null;
+  var els = document.querySelectorAll("#pane [data-open]");
+  for (var i = 0; i < els.length; i++) {
+    var on = els[i].getAttribute("data-open") === cur;
+    var host = els[i].classList.contains("rowmain") ? els[i].parentNode : els[i];
+    host.classList.toggle("sel", on);
+  }
+}
 function closeSheet() {
   var sheet = document.getElementById("sheet");
-  sheet.hidden = true;
-  sheet.innerHTML = "";
   sheetFor = null;
+  if (DESK.matches) {
+    sheet.innerHTML = sheetEmpty();
+    sheet.hidden = false;
+  } else {
+    sheet.hidden = true;
+    sheet.innerHTML = "";
+  }
+  markSel();
 }
+/* Step through whatever list is on screen, in the order it is shown. */
+function stepSheet(dir) {
+  var els = Array.prototype.slice.call(document.querySelectorAll("#pane [data-open]"));
+  if (!els.length) return;
+  var cur = sheetFor ? sheetFor.kind + ":" + sheetFor.key : null;
+  var i = -1;
+  for (var j = 0; j < els.length; j++) if (els[j].getAttribute("data-open") === cur) { i = j; break; }
+  var n = i < 0 ? (dir > 0 ? 0 : els.length - 1) : i + dir;
+  if (n < 0 || n >= els.length) return;
+  var a = els[n].getAttribute("data-open").split(":");
+  openSheet(a[0], a.slice(1).join(":"));
+  els[n].focus({ preventScroll: true });
+  els[n].scrollIntoView({ block: "nearest" });
+}
+DESK.addEventListener("change", function () {
+  if (sheetFor) { var s = sheetFor; openSheet(s.kind, s.key); } else closeSheet();
+  render();
+});
 
 /* ---------- close + undo ---------- */
 var lastClosed = null, toastTimer = null;
@@ -692,6 +991,8 @@ function themeLabel() {
 
 /* ---------- events ---------- */
 document.addEventListener("click", function (ev) {
+  var cl = ev.target.closest ? ev.target.closest(".clamp") : null;
+  if (cl) { cl.classList.toggle("open"); return; }
   var el = ev.target.closest ? ev.target.closest("[data-tab],[data-open],[data-close],[data-filter],[data-period],#hotonly,#sheetback,#act-close,#act-snooze,#act-next,#themebtn,#recheck") : null;
   if (!el) return;
 
@@ -724,6 +1025,12 @@ document.addEventListener("click", function (ev) {
   }
   if ((el.id === "act-snooze" || el.id === "act-next") && sheetFor) {
     var k = sheetFor.kind, kk = sheetFor.key;
+    if (document.querySelector('#pane [data-open="' + k + ':' + kk + '"]')) {
+      var before = sheetFor.key;
+      stepSheet(1);
+      if (sheetFor && sheetFor.key === before) { closeSheet(); render(); }
+      return;
+    }
     var list = (k === "owe" ? oweLive() : owedLive()).slice().sort(function (x, y) { return days(y.age) - days(x.age); });
     var i2 = -1;
     for (var j = 0; j < list.length; j++) if (list[j].key === kk) i2 = j;
@@ -748,7 +1055,11 @@ document.addEventListener("click", function (ev) {
 });
 
 document.addEventListener("keydown", function (ev) {
-  if (ev.key === "Escape" && sheetFor) { closeSheet(); render(); }
+  if (ev.key === "Escape" && sheetFor) { closeSheet(); render(); return; }
+  var t = ev.target && ev.target.tagName;
+  if (!DESK.matches || t === "TEXTAREA" || t === "INPUT" || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  if (ev.key === "j" || ev.key === "ArrowDown" && sheetFor) { ev.preventDefault(); stepSheet(1); }
+  else if (ev.key === "k" || ev.key === "ArrowUp" && sheetFor) { ev.preventDefault(); stepSheet(-1); }
 });
 
 /* ---------- standalone app ---------- */
@@ -760,6 +1071,7 @@ document.addEventListener("keydown", function (ev) {
 })();
 
 render();
+if (!sheetFor) closeSheet();
 
 /* The header stamp doubles as the connection flag */
 function syncOnline() {
