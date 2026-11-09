@@ -2,9 +2,10 @@
    Cache-first for the shell so the app opens on a plane. Bump CACHE on every
    deploy: the old cache is deleted on activate and clients reload once. */
 
-var CACHE = "km-desk-v9";
+var CACHE = "km-desk-v10";
 
 var DESK = "./data/desk.json";
+var SYSTEMS = "./data/systems.json";
 
 var SHELL = [
   "./",
@@ -60,21 +61,23 @@ self.addEventListener("fetch", function (e) {
     return;
   }
 
-  // The desk: network first so each rebuild shows up on the next open, with
-  // the last good copy kept for when there is no signal.
-  if (url.pathname.endsWith("/data/desk.json")) {
+  // The desk and the systems snapshot: network first so each rebuild shows up
+  // on the next open, with the last good copy kept for when there is no signal.
+  var saved = url.pathname.endsWith("/data/desk.json") ? DESK
+    : url.pathname.endsWith("/data/systems.json") ? SYSTEMS : null;
+  if (saved) {
     e.respondWith(
       fetch(req).then(function (res) {
         if (res && res.ok) {
           var copy = res.clone();
-          caches.open(CACHE).then(function (c) { c.put(DESK, copy); });
+          caches.open(CACHE).then(function (c) { c.put(saved, copy); });
           return res;
         }
-        return caches.match(DESK).then(function (hit) { return hit || res; });
+        return caches.match(saved).then(function (hit) { return hit || res; });
       }).catch(function () {
-        return caches.match(DESK).then(function (hit) {
+        return caches.match(saved).then(function (hit) {
           if (hit) return hit;
-          throw new Error("offline and no saved copy of the desk");
+          throw new Error("offline and no saved copy of " + saved);
         });
       })
     );

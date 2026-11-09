@@ -176,6 +176,17 @@ h2.sec { margin: 26px 0 10px; font-size: 12px; font-weight: 500; letter-spacing:
 .pill { display: inline-block; font-size: 11px; font-weight: 500; letter-spacing: 0.03em; padding: 3px 8px; border-radius: 10px; }
 .pill.new { color: var(--blue); background: var(--blue-tint); }
 .pill.warn { color: var(--accent); background: var(--accent-tint); }
+.pill.quiet { color: var(--fg-soft); background: var(--rule-soft); }
+
+/* ---- systems: scheduled tasks and API health ---- */
+.sysrow { display: block; padding: 14px 16px; border-top: 1px solid var(--rule-soft); color: var(--fg); text-decoration: none; }
+.sysrow:first-child { border-top: 0; }
+a.sysrow:hover { background: var(--rule-soft); }
+.syshead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sysname { font-size: 14.5px; font-weight: 500; line-height: 1.3; min-width: 0; }
+.sysmeta { margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--fg-soft); }
+.sysnote { margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--fg-soft); }
+.alertcard { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin-top: 14px; padding: 14px 16px; background: var(--accent-tint); border: 1px solid var(--accent-edge); border-radius: 16px; color: var(--accent); font-size: 13.5px; font-weight: 500; text-align: left; cursor: pointer; }
 
 /* ---- chips ---- */
 .chips { display: flex; gap: 7px; margin-top: 16px; flex-wrap: wrap; }
@@ -445,7 +456,7 @@ var DATA = { owe: [], owed: [], prj: [], dec: [] };
 var LOADED = false;
 var LOAD_ERR = null;
 
-var APP_VERSION = "km-desk-v9";  /* keep in step with CACHE in service-worker.js */
+var APP_VERSION = "km-desk-v10";  /* keep in step with CACHE in service-worker.js */
 var BUILT = null;     /* when the rebuild wrote desk.json */
 var FETCHED = null;   /* when this app last read it */
 var DESK_URL = "https://claude.ai/code/artifact/fb499e12-349a-4da5-8b82-e6046d23d692";
@@ -455,6 +466,13 @@ var DESK_URL = "https://claude.ai/code/artifact/fb499e12-349a-4da5-8b82-e6046d23
 var MKT = {};
 
 var ECOM = {};
+
+/* Scheduled tasks and API health, written by the "KMDesk systems sync" task
+   to data/systems.json. Loaded separately: a missing snapshot never blocks
+   the desk. */
+var SYS = null;        /* {built, tasks, health} */
+var SYS_ERR = null;
+var SYS_BUILT = null;
 
 /* ---------- local-only state (this browser) ---------- */
 var LS = "kmdesk-mobile-v1";
@@ -502,6 +520,7 @@ var IC = {
   owe: '<path d="m4 12 4 4 10-10"/><path d="M4 19h16"/>',
   num: '<path d="M5 20V11"/><path d="M12 20V5"/><path d="M19 20v-6"/>',
   work: '<path d="M3 7h18v13H3z"/><path d="M9 7V4h6v3"/>',
+  sys: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16v4"/>',
   more: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
   chev: '<path d="m9 18 6-6-6-6"/>',
@@ -561,6 +580,9 @@ function viewToday() {
     + '<div class="tile hot"><div class="tileval num">' + esc(tl.bb) + '</div><div class="tilelbl"><b class="tilescope">Amazon US</b>' + esc(tl.bbLbl) + '</div></div>'
     + '</div>';
   h += '</div>';
+
+  var sa = sysAlert();
+  if (sa) h += '<button type="button" class="alertcard" data-tab="systems"><span>' + esc(sa) + '</span><span class="chev">' + svg(IC.chev) + '</span></button>';
 
   h += '<div class="wide-grid"><section>';
   h += '<h2 class="sec">Needs you first</h2>';
@@ -818,6 +840,9 @@ function viewMore() {
     + '<a class="linkrow" href="' + DESK_URL + '" target="_blank" rel="noopener"><span>The full desk</span><span class="r">Teams, diary, press, United, travel</span></a>'
     + '<a class="linkrow" href="https://predict.pattern.com" target="_blank" rel="noopener"><span>Pattern Predict</span><span class="r">Intraday and SKU</span></a>'
     + '</div>'
+    + '<h2 class="sec">Systems</h2><div class="card">'
+    + '<button type="button" class="linkrow" data-tab="systems" style="width:100%;background:transparent;border:0;cursor:pointer"><span>Scheduled tasks and API health</span><span class="r">' + esc(sysSummary()) + '</span></button>'
+    + '</div>'
     + '<h2 class="sec">Display</h2><div class="card">'
     + '<button type="button" class="linkrow" id="themebtn" style="width:100%;background:transparent;border:0;cursor:pointer"><span>Theme</span><span class="r" id="themeval">System</span></button>'
     + '</div>'
@@ -829,7 +854,126 @@ function viewMore() {
   return h;
 }
 
-var VIEWS = { today: viewToday, owe: viewOwe, num: viewNumbers, work: viewWork, more: viewMore };
+/* ---------- systems ---------- */
+var BUCKET_ORDER = { attn: 0, asks: 1, ok: 2, off: 3 };
+function sysTasks() { return (SYS && Array.isArray(SYS.tasks)) ? SYS.tasks.filter(function (t) { return t && typeof t === "object"; }) : []; }
+function sysCount(b) { return sysTasks().filter(function (t) { return t.bucket === b; }).length; }
+function healthBad() {
+  var hs = SYS && SYS.health && SYS.health.summary;
+  return hs && typeof hs.bad === "number" ? hs.bad : 0;
+}
+function sysSummary() {
+  if (!SYS) return SYS_ERR ? "Not available" : "Reading\u2026";
+  var a = sysCount("attn"), n = sysTasks().length, bad = healthBad();
+  var parts = [a ? a + " need you" : n + " tasks"];
+  if (bad) parts.push(bad + " bad");
+  return parts.join(" \u00b7 ");
+}
+function sysAlert() {
+  if (!SYS) return "";
+  var a = sysCount("attn");
+  return a ? (a === 1 ? "1 scheduled task needs you" : a + " scheduled tasks need you") : "";
+}
+function fmtNext(iso) {
+  if (!iso || isNaN(Date.parse(iso))) return "";
+  var d = new Date(iso), now = new Date();
+  var hm = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }).replace(":", ".");
+  if (d.toDateString() === now.toDateString()) return "today " + hm;
+  var t = new Date(now); t.setDate(now.getDate() + 1);
+  if (d.toDateString() === t.toDateString()) return "tomorrow " + hm;
+  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) + " " + hm;
+}
+function taskPill(t) {
+  var cls = t.bucket === "attn" ? "warn" : t.bucket === "asks" ? "new" : "quiet";
+  return '<span class="pill ' + cls + '">' + esc(t.lastLabel || "\u2014") + '</span>';
+}
+function taskRow(t) {
+  var meta = [t.schedule, t.where, t.approval === "asks" ? "asks before acting" : "runs on its own"].filter(Boolean).join(" \u00b7 ");
+  var when = [];
+  if (t.lastAt) when.push("Last " + fmtWhen(new Date(t.lastAt)));
+  if (t.next && t.bucket !== "off") when.push("next " + fmtNext(t.next));
+  var href = typeof t.run === "string" && /^https:\/\//.test(t.run) ? t.run : "";
+  return (href ? '<a class="sysrow" href="' + esc(href) + '" target="_blank" rel="noopener">' : '<div class="sysrow">')
+    + '<div class="syshead"><span class="sysname">' + esc(t.name) + '</span>' + taskPill(t) + '</div>'
+    + '<div class="sysmeta">' + esc(meta) + '</div>'
+    + (when.length ? '<div class="sysmeta">' + esc(when.join(", ")) + '</div>' : "")
+    + (href ? '</a>' : '</div>');
+}
+var STATUS_ORDER = { bad: 0, warn: 1, skip: 2, ok: 3 };
+function healthRow(x, name, sub) {
+  var st = x.status || "skip";
+  var cls = st === "bad" ? "warn" : st === "warn" ? "new" : "quiet";
+  var figs = [x.code != null ? "HTTP " + x.code : "", x.ms != null ? x.ms + " ms" : ""].filter(Boolean).join(" \u00b7 ");
+  return '<div class="sysrow"><div class="syshead"><span class="sysname">' + esc(name) + '</span><span class="pill ' + cls + '">' + esc(st.charAt(0).toUpperCase() + st.slice(1)) + '</span></div>'
+    + ((sub || figs) ? '<div class="sysmeta">' + esc([sub, figs].filter(Boolean).join(" \u00b7 ")) + '</div>' : "")
+    + (x.note ? '<div class="sysnote">' + esc(x.note) + '</div>' : "")
+    + '</div>';
+}
+function healthSection(title, list, nameOf, subOf) {
+  if (!Array.isArray(list) || !list.length) return "";
+  var rows = list.filter(function (x) { return x && typeof x === "object"; }).slice().sort(function (a, b) {
+    return (STATUS_ORDER[a.status] == null ? 2 : STATUS_ORDER[a.status]) - (STATUS_ORDER[b.status] == null ? 2 : STATUS_ORDER[b.status]);
+  });
+  var bad = rows.filter(function (x) { return x.status === "bad" || x.status === "warn"; });
+  var good = rows.length - bad.length;
+  return '<h2 class="sec">' + esc(title) + '</h2><div class="card">'
+    + bad.map(function (x) { return healthRow(x, nameOf(x), subOf ? subOf(x) : ""); }).join("")
+    + (good ? '<div class="sysrow"><div class="sysmeta">' + good + (bad.length ? ' more' : '') + ' ok or skipped</div></div>' : "")
+    + '</div>';
+}
+function viewSystems() {
+  var h = '<div class="hello"><div><h1 class="view">Systems</h1><p class="sub-line">'
+    + esc(SYS_BUILT ? "Snapshot " + fmtWhen(SYS_BUILT) : SYS ? "Snapshot time not recorded" : SYS_ERR ? "Could not read the snapshot" : "Reading\u2026")
+    + '</p></div><button type="button" class="iconbtn" id="recheck-sys" aria-label="Reload the systems snapshot">' + svg(IC.refresh) + '</button></div>';
+  if (!SYS) {
+    return h + '<div class="empty"><div class="big">' + (SYS_ERR ? "No systems snapshot yet" : "Reading\u2026") + '</div><p>'
+      + esc(SYS_ERR || "") + (SYS_ERR ? " The KMDesk systems sync task writes data/systems.json every three hours from 07.13." : "") + '</p></div>';
+  }
+  var tasks = sysTasks().slice().sort(function (a, b) {
+    var d = (BUCKET_ORDER[a.bucket] == null ? 2 : BUCKET_ORDER[a.bucket]) - (BUCKET_ORDER[b.bucket] == null ? 2 : BUCKET_ORDER[b.bucket]);
+    return d || String(a.next || "~").localeCompare(String(b.next || "~"));
+  });
+  var groups = [
+    ["attn", "Needs you"],
+    ["asks", "Asks before acting"],
+    ["ok", "Running on their own"],
+    ["off", "Paused or ended"]
+  ];
+  h += '<div class="chips" style="margin-top:14px">'
+    + groups.map(function (g) { var n = sysCount(g[0]); return n ? '<span class="pill ' + (g[0] === "attn" ? "warn" : "quiet") + '">' + n + ' ' + esc(g[1].toLowerCase()) + '</span>' : ""; }).join("")
+    + '</div>';
+  groups.forEach(function (g) {
+    var list = tasks.filter(function (t) { return t.bucket === g[0]; });
+    if (!list.length) return;
+    h += '<h2 class="sec">' + esc(g[1]) + ' \u00b7 ' + list.length + '</h2><div class="card">' + list.map(taskRow).join("") + '</div>';
+  });
+  var other = tasks.filter(function (t) { return BUCKET_ORDER[t.bucket] == null; });
+  if (other.length) h += '<h2 class="sec">Other</h2><div class="card">' + other.map(taskRow).join("") + '</div>';
+
+  var H = SYS.health;
+  if (H && typeof H === "object") {
+    var sm = H.summary || {};
+    h += '<h2 class="sec">API health</h2><div class="card"><div class="sysrow">'
+      + '<div class="syshead"><span class="sysname">' + esc(H.label || (H.checkedAt ? fmtWhen(new Date(H.checkedAt)) : "Last check")) + '</span>'
+      + '<span class="pill ' + (sm.bad ? "warn" : "quiet") + '">' + (sm.bad || 0) + ' bad</span></div>'
+      + '<div class="sysmeta">' + [sm.ok != null ? sm.ok + " ok" : "", sm.warn != null ? sm.warn + " warn" : "", sm.skip != null ? sm.skip + " skipped" : ""].filter(Boolean).join(" \u00b7 ") + '</div>'
+      + '</div></div>';
+    if (Array.isArray(H.changes) && H.changes.length) {
+      h += '<h2 class="sec">Changed since the last check</h2><div class="card">' + H.changes.map(function (c) { return '<div class="sysrow"><div class="sysnote" style="margin:0">' + esc(c) + '</div></div>'; }).join("") + '</div>';
+    }
+    h += healthSection("Sites", H.sites, function (x) { return x.name || x.url; }, function (x) { return x.lastCommit ? "last commit " + x.lastCommit : ""; });
+    h += healthSection("External APIs", H.apis, function (x) { return x.name || x.host; }, function (x) { return x.host; });
+    h += healthSection("GitHub Actions", H.actions, function (x) { return (x.repo ? x.repo + " \u00b7 " : "") + (x.workflow || ""); });
+    h += healthSection("Claude connectors", H.connectors, function (x) { return x.name; });
+    if (Array.isArray(H.gaps) && H.gaps.length) {
+      h += '<h2 class="sec">Not checked</h2><div class="bigcard" style="margin-top:0">' + H.gaps.map(function (g) { return '<p class="note" style="margin:0 0 8px">' + esc(g) + '</p>'; }).join("") + '</div>';
+    }
+  }
+  h += '<p class="note">Read-only. Tap a task to open its last run. Approve, pause or edit tasks in Claude.</p>';
+  return h;
+}
+
+var VIEWS = { today: viewToday, owe: viewOwe, num: viewNumbers, work: viewWork, more: viewMore, systems: viewSystems };
 
 /* ---------- detail sheet ---------- */
 var sheetFor = null;
@@ -997,10 +1141,11 @@ function renderTabs() {
     ["owe", "Owe", IC.owe, owe ? String(owe) : ""],
     ["num", "Numbers", IC.num, ""],
     ["work", "Work", IC.work, ""],
-    ["more", "More", IC.more, ""]
+    ["more", "More", IC.more, SYS && sysCount("attn") ? String(sysCount("attn")) : ""]
   ];
   document.getElementById("tabs").innerHTML = defs.map(function (d) {
-    return '<button type="button" class="tab" data-tab="' + d[0] + '" aria-current="' + (state.tab === d[0]) + '">'
+    var cur = state.tab === d[0] || (d[0] === "more" && state.tab === "systems");
+    return '<button type="button" class="tab" data-tab="' + d[0] + '" aria-current="' + cur + '">'
       + svg(d[2]) + '<span class="tablbl">' + d[1] + (d[3] ? ' <span class="tabcount">' + d[3] + '</span>' : "") + '</span></button>';
   }).join("");
 }
@@ -1029,7 +1174,7 @@ function themeLabel() {
 document.addEventListener("click", function (ev) {
   var cl = ev.target.closest ? ev.target.closest(".clamp") : null;
   if (cl) { cl.classList.toggle("open"); return; }
-  var el = ev.target.closest ? ev.target.closest("[data-tab],[data-open],[data-close],[data-filter],[data-period],#hotonly,#sheetback,#act-close,#act-snooze,#act-next,#themebtn,#recheck") : null;
+  var el = ev.target.closest ? ev.target.closest("[data-tab],[data-open],[data-close],[data-filter],[data-period],#hotonly,#sheetback,#act-close,#act-snooze,#act-next,#themebtn,#recheck,#recheck-sys") : null;
   if (!el) return;
 
   if (el.hasAttribute("data-tab")) { state.tab = el.getAttribute("data-tab"); save(); closeSheet(); render(); return; }
@@ -1082,6 +1227,11 @@ document.addEventListener("click", function (ev) {
     state.theme = next; save();
     var tv2 = document.getElementById("themeval");
     if (tv2) tv2.textContent = themeLabel();
+    return;
+  }
+  if (el.id === "recheck-sys") {
+    el.classList.add("spin");
+    loadSystems(true).then(function () { el.classList.remove("spin"); });
     return;
   }
   if (el.id === "recheck") {
@@ -1207,9 +1357,37 @@ function nextRebuild() {
 }
 loadDesk(false);
 
+var SYS_FETCHED = null;
+function loadSystems(manual) {
+  return fetch("./data/systems.json", { cache: "no-store" })
+    .then(function (r) {
+      if (r.status === 404) throw new Error("data/systems.json has not been written yet.");
+      if (!r.ok) throw new Error("data/systems.json returned " + r.status);
+      var w = r.headers.get("X-Desk-Written");
+      return r.json().then(function (d) { return { d: d, w: w }; });
+    })
+    .then(function (x) {
+      if (!(x.d && Array.isArray(x.d.tasks))) throw new Error("data/systems.json is not in the expected shape.");
+      SYS = x.d; SYS_ERR = null;
+      var b = x.d.built || x.w;
+      SYS_BUILT = b && !isNaN(Date.parse(b)) ? new Date(b) : null;
+      SYS_FETCHED = new Date();
+      render();
+      if (manual) showToast("Systems snapshot from " + (SYS_BUILT ? fmtWhen(SYS_BUILT) : "the last write"));
+    })
+    .catch(function (e) {
+      SYS_ERR = (e && e.message) || "data/systems.json could not be read.";
+      if (!SYS) render();
+      if (manual) showToast("Could not reload systems \u2014 " + SYS_ERR);
+    });
+}
+loadSystems(false);
+
 /* Coming back to the app picks up a newer rebuild without a tap. */
 document.addEventListener("visibilitychange", function () {
-  if (document.visibilityState === "visible" && (!FETCHED || Date.now() - FETCHED.getTime() > 60000)) loadDesk(false);
+  if (document.visibilityState !== "visible") return;
+  if (!FETCHED || Date.now() - FETCHED.getTime() > 60000) loadDesk(false);
+  if (!SYS_FETCHED || Date.now() - SYS_FETCHED.getTime() > 60000) loadSystems(false);
 });
 
 /* Updates install themselves: check for a new service worker whenever the app

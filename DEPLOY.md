@@ -110,13 +110,31 @@ curl -sS -X PUT "https://km-ingest.richardmcallister.app/desk" \
 ```
 
 `km-ingest.richardmcallister.app` is deliberately outside Access and answers
-only `PUT /desk` with the right key; everything else is 404. The key can
+only `PUT /desk` and `PUT /systems` with the right key; everything else is 404. The key can
 overwrite the desk but cannot read it. The Worker rejects anything that is not
 JSON with `owe`, `owed`, `prj` and `dec` lists, so a broken run cannot blank
 the app. Add a top-level `"built"` ISO timestamp and the app shows that as the
 rebuild time; otherwise it shows the write time.
 
-Rotate the key (and update the task) with:
+### The systems snapshot
+
+The "KMDesk systems sync" scheduled task writes a snapshot of every scheduled
+task and the latest API health check through the same door and key:
+
+```bash
+curl -sS -X PUT "https://km-ingest.richardmcallister.app/systems" \
+  -H "Authorization: Bearer $DESK_WRITE_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary @systems.json
+# → {"ok":true,"written":"…","counts":{"tasks":36,"attn":0,"asks":11,"ok":25,"off":0},"warnings":[]}
+```
+
+The body is `{built, tasks: [...], health: {...}}`. The Worker rejects anything
+without a `tasks` list. It is stored in KV under `systems.json` and served to
+the app as `/data/systems.json`, which the More → Systems screen reads. Today
+shows a banner when a task's `bucket` is `attn`.
+
+Rotate the key (and update both tasks) with:
 
 ```bash
 npx wrangler secret put DESK_WRITE_KEY
@@ -149,7 +167,7 @@ package.json                   wrangler only
 .github/workflows/deploy.yml   deploy on push to main, with the cache-bump guard
 .gitignore                     excludes public/data/desk.json
 public/index.html              the shell, no desk content
-src/worker.js                  serves /data/desk.json from KV
+src/worker.js                  serves /data/desk.json and /data/systems.json from KV
 scripts/put-desk.sh            npm run desk:put — writes the desk to KV
 public/.assetsignore           keeps desk.json out of static assets
 public/data/desk.sample.json   the shape, committed
